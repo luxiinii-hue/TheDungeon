@@ -1,6 +1,7 @@
 """Entry point for Dungeon of the Acoc."""
 
 import asyncio
+import pygame
 from src.core.game import Game
 
 
@@ -9,5 +10,4 @@ async def main():
     await game.run()
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())
