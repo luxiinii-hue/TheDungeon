@@ -3,7 +3,7 @@ name: Deploy Pygbag to GitHub Pages
 on:
   push:
     branches:
-      - onelanestyle
+      - onelanestyle-branch
   workflow_dispatch:
 
 permissions:
