@@ -1,7 +1,17 @@
 """Target selection logic for abilities and auto-attacks."""
 
 import random
+import math
 from src.combat.unit import CombatUnit
+
+
+def get_nearest_enemy(source: CombatUnit,
+                      enemies: list[CombatUnit]) -> CombatUnit | None:
+    """Return the nearest alive enemy by distance."""
+    alive = [u for u in enemies if u.alive]
+    if not alive:
+        return None
+    return min(alive, key=lambda u: math.hypot(u.x - source.x, u.y - source.y))
 
 
 def get_targets(targeting: str, source: CombatUnit,
@@ -12,9 +22,8 @@ def get_targets(targeting: str, source: CombatUnit,
     alive_allies = [u for u in allies if u.alive]
 
     if targeting == "single_enemy":
-        if alive_enemies:
-            return [random.choice(alive_enemies)]
-        return []
+        nearest = get_nearest_enemy(source, enemies)
+        return [nearest] if nearest else []
 
     elif targeting == "all_enemies":
         return alive_enemies
@@ -30,7 +39,6 @@ def get_targets(targeting: str, source: CombatUnit,
     elif targeting == "self":
         return [source]
 
-    # Default: single enemy
-    if alive_enemies:
-        return [random.choice(alive_enemies)]
-    return []
+    # Default: nearest enemy
+    nearest = get_nearest_enemy(source, enemies)
+    return [nearest] if nearest else []

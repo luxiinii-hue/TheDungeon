@@ -21,6 +21,31 @@ class AbilityEffect:
 
 
 @dataclass
+class ProjectileConfig:
+    """How this ability's projectile behaves."""
+    speed: float = 400.0
+    size_w: int = 20
+    size_h: int = 12
+    color: tuple = (255, 200, 80)
+    sprite: str = ""  # asset path, empty = use color fallback
+    is_aoe: bool = False  # hits all enemies, not just first
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> "ProjectileConfig | None":
+        if not data:
+            return None
+        color = tuple(data["color"]) if "color" in data else (255, 200, 80)
+        return cls(
+            speed=data.get("speed", 400.0),
+            size_w=data.get("size_w", 20),
+            size_h=data.get("size_h", 12),
+            color=color,
+            sprite=data.get("sprite", ""),
+            is_aoe=data.get("is_aoe", False),
+        )
+
+
+@dataclass
 class AbilityDef:
     id: str
     name: str
@@ -28,14 +53,16 @@ class AbilityDef:
     targeting: str  # "single_enemy", "all_enemies", "single_ally", "all_allies", "self"
     base_damage: int
     scaling: float
-    cooldown: int
+    cooldown: float  # seconds in real-time
     effects: list[AbilityEffect] = field(default_factory=list)
     icon: str = ""
     animation: dict = field(default_factory=dict)
+    projectile: ProjectileConfig | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "AbilityDef":
         effects = [AbilityEffect.from_dict(e) for e in data.get("effects", [])]
+        proj = ProjectileConfig.from_dict(data.get("projectile"))
         return cls(
             id=data["id"],
             name=data["name"],
@@ -47,6 +74,7 @@ class AbilityDef:
             effects=effects,
             icon=data.get("icon", ""),
             animation=data.get("animation", {}),
+            projectile=proj,
         )
 
 
