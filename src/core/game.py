@@ -1,5 +1,6 @@
 """Master game loop, clock, and state machine owner."""
 
+import asyncio
 import pygame
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, TITLE
 from src.core.state_machine import StateMachine, GameState
@@ -37,7 +38,7 @@ class Game:
         self.state_machine.register(GameState.REWARD, RewardState(self))
         self.state_machine.register(GameState.RESULT, ResultState(self))
 
-    def run(self):
+    async def run(self):
         while self.running:
             dt = self.clock.tick(FPS) / 1000.0
             for event in pygame.event.get():
@@ -48,5 +49,6 @@ class Game:
             self.state_machine.current.update(dt)
             self.state_machine.current.draw(self.screen)
             pygame.display.flip()
+            await asyncio.sleep(0)
 
         pygame.quit()
