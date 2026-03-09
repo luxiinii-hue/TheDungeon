@@ -1,6 +1,7 @@
 """Runtime combat unit wrapper — mutable state around static definitions."""
 
 from dataclasses import dataclass, field
+from config import ATTACK_COOLDOWN_BASE, ATTACK_COOLDOWN_SPEED_FACTOR, ATTACK_COOLDOWN_MIN
 
 
 @dataclass
@@ -28,24 +29,76 @@ class CombatUnit:
         self.passive = passive
         self.ability_mods = ability_mods or []
 
-        # Cooldown tracking: ability_id -> turns remaining
-        self.cooldowns: dict[str, int] = {}
+        # Cooldown tracking: ability_id -> seconds remaining (real-time)
+        self.cooldowns: dict[str, float] = {}
         self.buffs: list[Buff] = []
         self.stunned = False
         self.alive = True
 
         # Track stats for mana surge passive
         self.turns_alive = 0
+        self.time_alive = 0.0  # seconds alive in real-time combat
+
+        # Real-time position (pixel coords, set by combat state)
+        self.x: float = 0.0
+        self.y: float = 0.0
+
+        # Auto-attack timer
+        self.attack_interval = max(
+            ATTACK_COOLDOWN_MIN,
+            ATTACK_COOLDOWN_BASE - speed * ATTACK_COOLDOWN_SPEED_FACTOR,
+        )
+        self.attack_timer: float = 0.0
 
     @property
     def is_stunned(self) -> bool:
         return any(b.type == "stun" and b.duration > 0 for b in self.buffs)
 
+    @property
+    def unit_rect(self) -> "pygame.Rect":
+        import pygame
+        from config import UNIT_HITBOX_W, UNIT_HITBOX_H
+        return pygame.Rect(
+            int(self.x - UNIT_HITBOX_W / 2),
+            int(self.y - UNIT_HITBOX_H / 2),
+            UNIT_HITBOX_W, UNIT_HITBOX_H,
+        )
+
+    def tick_cooldowns_rt(self, dt: float):
+        """Tick cooldowns by real-time delta (seconds)."""
+        for ability_id in list(self.cooldowns):
+            self.cooldowns[ability_id] = max(0.0, self.cooldowns[ability_id] - dt)
+
     def tick_cooldowns(self):
+        """Legacy turn-based tick (kept for compatibility)."""
         for ability_id in list(self.cooldowns):
             self.cooldowns[ability_id] = max(0, self.cooldowns[ability_id] - 1)
 
+    def tick_buffs_rt(self, dt: float) -> int:
+        """Tick buffs in real-time. Returns burn damage if a tick fires."""
+        damage = 0
+        for buff in self.buffs:
+            if buff.type == "burn" and buff.duration > 0:
+                # Burn ticks once per second via timer
+                if not hasattr(buff, '_tick_timer'):
+                    buff._tick_timer = 0.0
+                buff._tick_timer += dt
+                if buff._tick_timer >= 1.0:
+                    buff._tick_timer -= 1.0
+                    damage += int(buff.value)
+                    buff.duration -= 1
+            elif buff.type == "stun":
+                if not hasattr(buff, '_tick_timer'):
+                    buff._tick_timer = 0.0
+                buff._tick_timer += dt
+                if buff._tick_timer >= 1.0:
+                    buff._tick_timer -= 1.0
+                    buff.duration -= 1
+        self.buffs = [b for b in self.buffs if b.duration > 0]
+        return damage
+
     def tick_buffs(self):
+        """Legacy turn-based tick (kept for compatibility)."""
         damage = 0
         for buff in self.buffs:
             if buff.type == "burn" and buff.duration > 0:
@@ -57,8 +110,8 @@ class CombatUnit:
     def can_use_ability(self, ability_id: str) -> bool:
         return self.cooldowns.get(ability_id, 0) <= 0
 
-    def put_on_cooldown(self, ability_id: str, cooldown: int):
-        self.cooldowns[ability_id] = cooldown
+    def put_on_cooldown(self, ability_id: str, cooldown: float):
+        self.cooldowns[ability_id] = float(cooldown)
 
     def add_buff(self, buff_type: str, duration: int, value: float = 0):
         self.buffs.append(Buff(type=buff_type, duration=duration, value=value))

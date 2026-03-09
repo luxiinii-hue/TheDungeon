@@ -161,6 +161,11 @@ def spawn_death_burst(emitter: ParticleEmitter, x: float, y: float,
                        lifetime=0.8, size_range=(3, 7), gravity=50.0)
 
 
+def spawn_projectile_trail(emitter: ParticleEmitter, x: float, y: float, color: tuple):
+    """Small particle left behind a flying projectile."""
+    emitter.emit_burst(x, y, 1, color, speed_range=(0, 10),
+                       lifetime=0.3, size_range=(1, 3), gravity=5.0)
+
 # Map ability names to spawn functions
 ABILITY_PARTICLES = {
     "Shadow Bolt": spawn_shadow_bolt,

@@ -68,6 +68,26 @@ MAP_NODE_RADIUS = 22
 MAP_NODE_SPACING_X = 200
 MAP_NODE_SPACING_Y = 120
 
+# Real-time combat
+PLAYER_ZONE_X_MIN = 40
+PLAYER_ZONE_X_MAX = 400
+PLAYER_ZONE_Y_MIN = 100
+PLAYER_ZONE_Y_MAX = 580
+ENEMY_ZONE_X_MIN = 880
+ENEMY_ZONE_X_MAX = 1240
+ENEMY_ZONE_Y_MIN = 100
+ENEMY_ZONE_Y_MAX = 580
+PLAYER_MOVE_SPEED = 250  # Increased for snappier dodging
+PROJECTILE_BASE_SPEED = 700  # Faster auto-attacks
+PROJECTILE_ABILITY_SPEED = 600
+ATTACK_COOLDOWN_BASE = 2.0  # Slightly faster base attacks
+ATTACK_COOLDOWN_SPEED_FACTOR = 0.3
+ATTACK_COOLDOWN_MIN = 0.4
+UNIT_HITBOX_W = 60
+UNIT_HITBOX_H = 120
+
+# Visual tuning (Gemini section)
+
 # Class colors (for UI badges)
 CLASS_COLORS = {
     "warlock": (160, 80, 200),
@@ -75,4 +95,12 @@ CLASS_COLORS = {
     "sorcerer": (200, 100, 180),
     "barbarian": (200, 60, 60),
     "ranger": (80, 180, 80),
+}
+
+CLASS_ATTACK_SPRITES = {
+    "acoc1": "UI/weapon_icons/Icon28_19.png",   # Shadow Wraith (purple projectile/dagger)
+    "acoc2": "UI/weapon_icons/Icon28_09.png",   # Flame Knight (sword)
+    "acoc3": "UI/weapon_icons/Icon28_15.png",   # Goblin Mage (wand/orb)
+    "acoc4": "UI/weapon_icons/Icon28_28.png",   # Nightfang (axe/claw)
+    "acoc5": "UI/weapon_icons/Icon28_13.png",   # Briarfoot (arrow)
 }
