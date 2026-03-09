@@ -58,6 +58,7 @@ class AbilityDef:
     icon: str = ""
     animation: dict = field(default_factory=dict)
     projectile: ProjectileConfig | None = None
+    range: str = "ranged"  # "melee" (front ranks only) or "ranged" (any rank)
 
     @classmethod
     def from_dict(cls, data: dict) -> "AbilityDef":
@@ -75,6 +76,7 @@ class AbilityDef:
             icon=data.get("icon", ""),
             animation=data.get("animation", {}),
             projectile=proj,
+            range=data.get("range", "ranged"),
         )
 
 

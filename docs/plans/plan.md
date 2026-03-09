@@ -1,197 +1,238 @@
-# Dungeon of the Acoc — Real-Time Side-Scroller Combat Pivot
+# Dungeon of the Acoc — ATB Lane Combat Pivot
 
 ## Vision
 
-Replace the turn-based auto-battler with **real-time side-scroller combat** (Castle Crashers / Cuphead style). Party of 2-4 characters on the left, enemies on the right. Auto-attacks fire continuously as horizontal projectiles. One character is player-controlled (WASD movement + clickable abilities with cooldowns), the rest are AI-driven. Designed for future multiplayer.
+Replace the real-time side-scroller (WASD + dodge) with a **Single-Lane ATB (Active Time Battle)** system inspired by Darkest Dungeon's positioning and Final Fantasy's speed bars. Combat is continuous and real-time but driven by speed bars rather than twitch movement.
 
 ---
 
-## Layout & Zones
+## Layout (1D Lane)
 
 ```
-|<--- Player Zone (0-400px) --->|<--- No-Man's Land --->|<--- Enemy Zone (880-1280px) --->|
-|                                |                       |                                 |
-|  [Player]  [AI Ally]           |   ~~~projectiles~~~   |          [Enemy1]  [Enemy2]     |
-|            [AI Ally]           |   ~~~projectiles~~~   |          [Enemy3]               |
-|                                |                       |                                 |
-| Y: 100-600 (playable area)    |                       | Enemies hold positions or drift |
+Position 4    3    2    1          1    2    3    4
+(Back)                (Front)  (Front)              (Back)
+
+[Ranger] [Mage] [Pala] [Barb]  ~~~projectiles~~~  [Slime] [Goblin] [Bat] [Boss]
+  ▓▓▓░    ▓▓░░   ▓▓▓▓   ▓▓▓░   →→→  ←←←  →→→    ▓▓░░    ▓▓▓░    ▓░░░   ▓▓▓▓
+  SPD BAR  SPD    SPD    SPD                        SPD     SPD     SPD    SPD
+
+|<-------- Player Team -------->|                  |<------- Enemy Team ------->|
 ```
 
 - **Screen**: 1280x720 (unchanged)
-- **Player zone**: x 40-400, y 100-600 — player character moves freely with WASD
-- **Enemy zone**: x 880-1240, y 100-600 — enemies hold positions or drift vertically
-- **Projectile travel**: horizontal across the middle gap
-- **HUD**: bottom strip (y 620-720) for ability bar, HP, info
+- **Player team** arranged left side, positions 1-4 (front to back), evenly spaced
+- **Enemy team** arranged right side, positions 1-4 (front to back), evenly spaced
+- **No free movement** — characters are fixed at their rank position
+- **Projectiles** travel horizontally between the two sides
+- **HUD**: bottom strip for speed bars, ability icons, HP
+
+### Position Coordinates (approximate)
+
+Player team x-positions (front=1 to back=4): ~350, 250, 150, 50 (+ offset)
+Enemy team x-positions (front=1 to back=4): ~930, 1030, 1130, 1230 (+ offset)
+Y-positions: vertically centered with slight stagger per rank
 
 ---
 
 ## Core Mechanics
 
-### Auto-Attacks (All Units)
+### Speed/ATB Bar System
 
-Every unit fires auto-attacks on a repeating timer derived from speed stat:
+Every unit has a **speed bar** that fills continuously based on their speed stat:
+
 ```
-attack_interval = max(0.5, 2.5 - speed * 0.4)  # seconds between shots
+fill_rate = base_fill_rate * (1 + speed * speed_scaling)
 ```
-- Player units fire rightward, enemy units fire leftward
-- Auto-attack projectiles deal `strength`-based damage
-- Simple horizontal movement at constant speed (~500 px/s)
-- Small sprite or colored circle (class-themed)
 
-### Player Character
+- Bar range: 0.0 → 1.0
+- When bar reaches 1.0: unit fires auto-attack, bar resets to 0.0
+- Stunned units: bar paused (does not fill)
+- Haste/slow buffs: multiply fill_rate
 
-- **WASD movement**: free 2D movement within player zone, ~200 px/s
-- **Auto-attacks**: fire automatically like everyone else
-- **Abilities**: activated via mouse click on HUD buttons or keyboard (1-4)
-  - Each ability has a cooldown timer (seconds, from ability data)
-  - Abilities spawn special projectiles (larger, animated, more damage)
-  - Some abilities are AoE (hit all enemies in a vertical band)
-- **Dodge potential**: move vertically to avoid incoming enemy projectiles
+### Auto-Attacks
 
-### AI Allies
+When a unit's speed bar fills:
+- **Melee units** (position 1-2): attack the front-most living enemy (position 1 priority)
+- **Ranged units** (position 3-4): projectile can target any enemy rank; defaults to lowest-HP or front
+- Projectile spawns at attacker's position, travels horizontally to target
+- Damage: `strength * auto_attack_scaling - target.armor * armor_factor`
 
-- Auto-attack on their timer (same as all units)
-- Use abilities randomly when off cooldown
-- Position: maintain loose formation around player character
-  - Follow player's Y with offset and slight delay (smooth lerp)
-  - Stay in player zone, spread vertically to avoid clustering
+### Abilities
 
-### Enemies
+Abilities have their own cooldown timers (seconds-based, independent of speed bar):
 
-- Auto-attack leftward on their timer
-- Use abilities when off cooldown (same logic as current enemy AI)
-- Hold assigned positions with slight vertical drift/bob
-- Phase 1: stationary. Later: melee enemies can advance toward player zone
+- **Player-controlled unit**: abilities are manually activated via click/hotkey (1-4) when off cooldown. Auto-attacks still fire automatically via speed bar.
+- **AI allies**: use abilities automatically when off cooldown, choosing randomly or by priority
+- **Enemies**: same as AI allies
+
+Ability targeting respects position:
+- "single_enemy" melee abilities: can only target position 1-2
+- "single_enemy" ranged abilities: can target any position
+- "all_enemies": hits all living enemies
+- "single_ally" / "all_allies" / "self": unchanged
+
+### Position-Based Mechanics
+
+- **Front line (pos 1-2)**: takes hits first, melee attacks available, higher threat
+- **Back line (pos 3-4)**: protected from melee, ranged attacks, support abilities
+- Some abilities can **push/pull** units (change rank position):
+  - Push: target moves back 1 rank (pos 1→2)
+  - Pull: target moves forward 1 rank (pos 3→2)
+  - If destination occupied, swap positions
+- When front unit dies, remaining units slide forward (pos 2→1, 3→2, etc.)
 
 ---
 
-## What Gets Replaced vs Preserved
+## What Changes vs. Previous System
 
-| Current File | Action | Notes |
+| Component | Old (Side-Scroller) | New (ATB Lane) |
 |---|---|---|
-| `auto_battle.py` | **REPLACED** by `realtime_battle.py` | Turn system → continuous real-time loop |
-| `combat_state.py` | **HEAVY REWRITE** | New rendering, input handling, projectile drawing |
-| `unit.py` | **EXTENDED** | Add `x, y` position, `attack_timer`, `attack_interval` |
-| `ability.py` | **EXTENDED** | Add `projectile_speed`, `projectile_sprite`, `is_aoe` |
-| `targeting.py` | **SIMPLIFIED** | Nearest-enemy or all-enemies, no turn order |
-| `idle_animator.py` | **PRESERVED** | Renders unit sprites at their x,y position |
-| `ability_animator.py` | **PRESERVED** | Impact effects at hit location |
-| `combat_animator.py` | **PRESERVED** | Shake/flash on hit |
-| `particles.py` | **PRESERVED** | Hit sparks, death bursts, floating numbers |
-| `config.py` | **EXTENDED** | Zone boundaries, projectile speeds, attack intervals |
-| `run_manager.py` | **PRESERVED** | Run persistence unchanged |
-| `state_machine.py` | **PRESERVED** | Same state flow (TITLE→TEAM_SELECT→MAP→COMBAT→REWARD→RESULT) |
-| `data/abilities.json` | **EXTENDED** | Add projectile config fields per ability |
-| `data/characters.json` | **PRESERVED** | Stats still drive combat math |
+| Movement | WASD free 2D movement | Fixed rank positions (no player movement) |
+| Attack trigger | Timer-based auto-fire | Speed bar fills → auto-attack |
+| Player interaction | Dodge + click abilities | Click abilities only (timing matters) |
+| Positioning | Pixel x,y coords | Rank 1-4 integer |
+| AI allies | Follow player, random ability use | Fixed rank, auto-ability on cooldown |
+| Targeting | Nearest enemy by distance | Rank-based (melee=front, ranged=any) |
+| Projectiles | Fly freely, collision detection | Fly to specific target rank, guaranteed hit |
+| Dodging | Move out of projectile path | No dodge (position-based defense instead) |
+
+### Files Impact
+
+| File | Action | Notes |
+|---|---|---|
+| `combat_state.py` | **HEAVY REWRITE** | Remove WASD, add speed bar rendering, rank-based layout |
+| `realtime_battle.py` | **HEAVY REWRITE** | Replace projectile-spam loop with ATB tick system |
+| `unit.py` | **MODIFY** | Replace x,y with `rank: int`, add `speed_bar: float`, remove `attack_timer` |
+| `ability.py` | **MODIFY** | Add `range` field (melee/ranged), add push/pull effect types |
+| `projectile.py` | **SIMPLIFY** | Targeted projectiles (no collision detection, fly to rank x-pos) |
+| `ai_controller.py` | **REWRITE** | Remove positioning logic, add ability priority/targeting by rank |
+| `targeting.py` | **REWRITE** | Rank-based targeting (front priority for melee, any for ranged) |
+| `config.py` | **MODIFY** | Replace zone constants with rank position constants, ATB tuning |
+| `abilities.json` | **MODIFY** | Add range field, adjust targeting for rank system |
+| `characters.json` | **MODIFY** | Add default_rank or preferred_position per character |
+| `idle_animator.py` | PRESERVED | Still renders sprites at computed rank positions |
+| `ability_animator.py` | PRESERVED | Impact effects at target rank position |
+| `combat_animator.py` | PRESERVED | Hit flash, knockback (now horizontal shift at rank) |
+| `particles.py` | PRESERVED | Hit sparks, death bursts |
+| `run_manager.py` | PRESERVED | Unchanged |
+| `auto_battle.py` | DELETE or IGNORE | Fully superseded |
 
 ---
 
-## New Modules
+## ATB Tick System (combat loop detail)
+
+Each frame (`dt` = time since last frame):
 
 ```
-src/combat/
-    realtime_battle.py   # NEW — real-time engine: timers, projectile spawning, collision, win/lose
-    projectile.py        # NEW — Projectile class: position, velocity, damage, update, draw
-    ai_controller.py     # NEW — AI for ally positioning + ability usage
-    auto_battle.py       # KEPT as backup, not imported
+for each living unit:
+    if unit.stunned: continue
 
-src/ui/
-    ability_hud.py       # NEW — bottom bar: ability icons, cooldown overlays, hotkey labels
+    # 1. Fill speed bar
+    unit.speed_bar += fill_rate(unit.speed) * dt
+
+    # 2. Check if bar full
+    if unit.speed_bar >= 1.0:
+        unit.speed_bar = 0.0
+
+        # 3. Determine target based on rank
+        target = select_target(unit, enemy_team)
+
+        # 4. Spawn auto-attack projectile toward target
+        spawn_projectile(unit, target, is_auto=True)
+
+    # 5. Tick ability cooldowns
+    unit.tick_cooldowns_rt(dt)
+
+    # 6. AI ability usage (non-player units)
+    if unit is not player_controlled and has_ready_ability(unit):
+        use_random_ability(unit)
+
+# 7. Update all active projectiles (move toward target)
+for projectile in active_projectiles:
+    projectile.update(dt)
+    if projectile.reached_target():
+        apply_damage(projectile)
+        remove(projectile)
+
+# 8. Tick buffs (burn, stun duration)
+for each living unit:
+    unit.tick_buffs_rt(dt)
+
+# 9. Check win/lose
+if all enemies dead: victory
+if all players dead: defeat
 ```
-
----
-
-## Damage & Combat Math (Preserved)
-
-```
-raw = base_value + strength * scaling
-final = max(1, raw - target.armor * 0.5)
-```
-
-All passives remain:
-- Phase (25% dodge on hit) — projectile passes through with "dodge" effect
-- Flame Aura (20% reflect) — on-hit reflect damage
-- Rage (+25% dmg below 50% HP) — applied at projectile spawn
-- Mana Surge (+10% dmg per N seconds alive) — accumulates over real time
-
-Ability mods remain: vampiric, burning, piercing.
-
----
-
-## Collision Detection
-
-Simple axis-aligned rectangle overlap:
-- Each projectile has a hitbox (e.g., 16x8 px for auto-attacks, larger for abilities)
-- Each unit has a hitbox centered on their position (e.g., 60x120 px)
-- Check: projectile rect overlaps any enemy unit rect in opposing team
-- On hit: apply damage, destroy projectile (or pierce for some abilities), spawn effects
-- Projectiles pass through friendly units (no friendly fire)
-- Projectiles despawn when off-screen (x < 0 or x > SCREEN_WIDTH)
 
 ---
 
 ## Agent Division of Labor
 
-### Claude Code — Backend / Engine / Logic
+### Claude Code — Core Systems & Logic
 
-Claude handles the systems architecture, real-time loop, physics, input, and data flow.
+Claude builds the ATB engine, rank system, targeting logic, and data schema changes.
 
-| Priority | Task | Files |
-|----------|------|-------|
-| 1 | `Projectile` class (position, velocity, hitbox, update, collision check) | `src/combat/projectile.py` |
-| 2 | `RealtimeBattle` engine (per-frame update: tick timers → spawn projectiles → move projectiles → detect collisions → apply damage → emit BattleAction events → check win/lose) | `src/combat/realtime_battle.py` |
-| 3 | Extend `CombatUnit` with `x, y, attack_timer, attack_interval` | `src/combat/unit.py` |
-| 4 | Extend `AbilityDef` with `projectile_speed, projectile_sprite, is_aoe` | `src/combat/ability.py` |
-| 5 | Add projectile_config to each ability entry | `data/abilities.json` |
-| 6 | `AIController` for ally unit positioning + ability timing | `src/combat/ai_controller.py` |
-| 7 | Rewrite `combat_state.py` — structural: wire RealtimeBattle, handle WASD input, render units at x,y, draw projectiles, integrate HUD | `src/states/combat_state.py` |
-| 8 | Add real-time combat constants to config | `config.py` |
-| 9 | Adapt targeting for nearest-enemy / all-enemies | `src/combat/targeting.py` |
-| 10 | Death handling, victory/defeat transitions | `realtime_battle.py`, `combat_state.py` |
+| Priority | Task | Key Files |
+|----------|------|-----------|
+| 1 | Define rank position constants and ATB tuning in config | `config.py` |
+| 2 | Modify CombatUnit: replace x/y with rank, add speed_bar, remove attack_timer | `unit.py` |
+| 3 | Add range field to AbilityDef, push/pull effect types | `ability.py` |
+| 4 | Rewrite RealtimeBattle as ATB tick engine | `realtime_battle.py` |
+| 5 | Rewrite targeting.py for rank-based targeting | `targeting.py` |
+| 6 | Simplify Projectile to targeted (no collision, fly to rank) | `projectile.py` |
+| 7 | Rewrite AIController for rank-aware ability selection | `ai_controller.py` |
+| 8 | Rewrite combat_state.py structure: ATB loop, input, rank layout | `combat_state.py` |
+| 9 | Update abilities.json with range fields | `data/abilities.json` |
+| 10 | Update characters.json with default_rank | `data/characters.json` |
+| 11 | Death rank-slide logic (units shift forward when front dies) | `realtime_battle.py` |
+| 12 | Victory/defeat transitions | `combat_state.py`, `realtime_battle.py` |
 
-### Gemini CLI — Frontend / Visuals / UI
+### Gemini CLI — Visual / UI / Frontend
 
-Gemini handles visual presentation, animation integration, UI widgets, and asset work.
+Gemini handles speed bar UI, rank layout rendering, ability animations, and visual polish.
 
-| Priority | Task | Files |
-|----------|------|-------|
-| 1 | `AbilityHUD` widget — bottom bar with ability icon buttons, cooldown sweep animation, hotkey labels (1-4), click handling | `src/ui/ability_hud.py` |
-| 2 | Projectile sprites — source/create auto-attack and ability projectile art per class, integrate into asset dirs | `character assets/` |
-| 3 | Adapt unit rendering — draw player/enemy sprites at their x,y coords using IdleAnimator, with HP bars floating above | `src/states/combat_state.py` (draw methods, after Claude's rewrite) |
-| 4 | Projectile trail particles — add particle presets for projectile travel (small trail) and impact (burst) | `src/animation/particles.py` |
-| 5 | Ability impact animations — ensure AbilityAnimator plays at correct hit position | `src/animation/ability_animator.py` |
-| 6 | Combat background — side-scroller appropriate background with parallax or atmospheric depth | `src/states/combat_state.py` (background) |
-| 7 | Player character highlight — subtle glow or indicator showing which unit is player-controlled | Visual polish |
-| 8 | Incoming projectile warning — subtle visual cue for dodgeable enemy projectiles | Visual polish |
+| Priority | Task | Key Files |
+|----------|------|-----------|
+| 1 | Speed bar UI widget (per-unit fill bar, class-colored) | `src/ui/speed_bar.py` (new) |
+| 2 | Rank-based unit rendering (draw units at computed rank positions) | `combat_state.py` (draw) |
+| 3 | Ability HUD update (adapt for no-movement, rank context) | `src/ui/ability_hud.py` |
+| 4 | Projectile flight animation (smooth travel from rank to rank) | `combat_state.py` (draw) |
+| 5 | Rank position push/pull animation (unit slides between ranks) | `src/animation/combat_animator.py` |
+| 6 | Combat background (Darkest Dungeon corridor style) | `combat_state.py` (background) |
+| 7 | Turn indicator / "ready!" flash when speed bar fills | Visual polish |
+| 8 | Death animation + rank collapse visual (units slide forward) | `combat_state.py`, `particles.py` |
 
-### Coordination Protocol
+### Coordination Rules
 
-- **`todo.md`** is the single source of truth for task status
-- Before touching a shared file, check todo.md for `IN PROGRESS` status
-- Claude completes the structural `combat_state.py` rewrite first (Sprint 1), then Gemini layers visuals on top (Sprint 2+)
-- `config.py` additions: Claude uses `# Real-time combat` section, Gemini uses `# Visual tuning` section
-- `abilities.json` changes: Claude adds schema fields, Gemini tunes visual values (sprite paths, tints)
+- Claude completes structural combat_state.py rewrite (Sprint 1) before Gemini layers visuals
+- `config.py`: Claude uses `# ATB combat` section, Gemini uses `# Visual tuning` section
+- `abilities.json`: Claude owns schema, Gemini tunes visual values
+- `todo.md` remains single source of truth for task status
 
 ---
 
-## Implementation Order
+## Implementation Sprints
 
-### Sprint 1: Playable Prototype (Claude, ~solo)
-Get projectiles flying across the screen with basic collision and damage.
-1. Create `projectile.py` and `realtime_battle.py`
-2. Extend `unit.py` and `ability.py`
-3. Rewrite `combat_state.py` structurally
-4. Basic rendering: units at positions, projectiles as circles, simple HUD
-5. WASD movement for player character
-6. **Milestone**: you can move, auto-attacks fly, enemies take damage and die
+### Sprint 1: ATB Prototype (Claude leads)
 
-### Sprint 2: Gameplay Layer (Claude + Gemini parallel)
-- **Claude**: AI controller, ability firing, cooldown system, passives, win/lose flow
-- **Gemini**: Ability HUD, projectile sprites, unit rendering polish, particles
-- **Milestone**: full combat loop with abilities, AI allies, proper visuals
+Get the ATB tick loop running with rank positions and auto-attacks.
 
-### Sprint 3: Polish (Both)
-- Balance: attack speeds, projectile speeds, damage, cooldowns
-- Visual: backgrounds, trails, impacts, death animations
-- Edge cases: multiple enemies, boss fights, relic/mod integration
-- **Milestone**: combat feels good, ready to replace auto-battler permanently
+1. Config: rank positions, ATB fill rates, targeting constants
+2. Unit: rank field, speed_bar, remove x/y movement
+3. RealtimeBattle: ATB tick loop (fill bars → fire → projectiles → damage)
+4. Targeting: front-priority melee, any-rank ranged
+5. Projectile: targeted (fly to rank, guaranteed hit on arrival)
+6. combat_state.py: wire ATB battle, draw units at ranks, basic speed bars
+7. **Milestone**: units auto-attack based on speed bars, damage flows, win/lose works
+
+### Sprint 2: Abilities & AI (Claude + Gemini parallel)
+
+- **Claude**: ability firing with rank targeting, AI controller, cooldowns, push/pull effects, player ability input
+- **Gemini**: speed bar widget, rank rendering polish, ability HUD, projectile visuals
+- **Milestone**: full ATB combat with abilities, AI, proper speed bar UI
+
+### Sprint 3: Polish & Balance (Both)
+
+- Balance: speed scaling, damage, cooldowns, rank advantages
+- Visual: corridor background, turn indicators, death animations, rank-slide animation
+- Data: tune all abilities for rank system, add range fields
+- **Milestone**: combat feels complete, Darkest Dungeon-style lane battles

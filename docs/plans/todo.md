@@ -1,4 +1,4 @@
-# Real-Time Side-Scroller Combat — Task Tracker
+# ATB Lane Combat — Task Tracker
 
 > **Coordination file for Claude Code and Gemini CLI.**
 > Check this file before starting any task. Update status when you start and finish.
@@ -6,42 +6,40 @@
 
 ---
 
-## Sprint 1: Playable Prototype (Claude leads)
+## Sprint 1: ATB Prototype (Claude leads)
 
 | # | Task | Owner | Status | Files | Depends On |
 |---|------|-------|--------|-------|------------|
-| 1.1 | Create Projectile class | Claude | DONE | `src/combat/projectile.py` | — |
-| 1.2 | Add real-time combat constants | Claude | DONE | `config.py` | — |
-| 1.3 | Extend CombatUnit (x, y, attack_timer, attack_interval) | Claude | DONE | `src/combat/unit.py` | — |
-| 1.4 | Extend AbilityDef (projectile config fields) | Claude | DONE | `src/combat/ability.py` | — |
-| 1.5 | Add projectile_config to abilities.json | Claude | DONE | `data/abilities.json` | 1.4 |
-| 1.6 | Create RealtimeBattle engine | Claude | DONE | `src/combat/realtime_battle.py` | 1.1, 1.3 |
-| 1.7 | Rewrite combat_state.py (structural) | Claude | DONE | `src/states/combat_state.py` | 1.1–1.6 |
-| 1.8 | WASD player movement | Claude | DONE | `src/states/combat_state.py` | 1.7 |
-| 1.9 | Basic projectile rendering (circles/rects) | Claude | DONE | `src/states/combat_state.py` | 1.7 |
-| 1.10 | Adapt targeting.py (nearest enemy) | Claude | DONE | `src/combat/targeting.py` | — |
+| 1.1 | Add ATB/rank constants to config (rank x/y positions, fill rates, targeting) | Claude | DONE | `config.py` | — |
+| 1.2 | Modify CombatUnit: add `rank`, `speed_bar`, `reduce_atb()`, remove x/y free-movement | Claude | DONE | `src/combat/unit.py` | — |
+| 1.3 | Add `range` field to AbilityDef (melee/ranged), push/pull effect types | Claude | DONE | `src/combat/ability.py` | — |
+| 1.4 | Rewrite RealtimeBattle as ATB tick engine (fill bars → trigger attacks → projectiles → damage → win/lose) | Claude | DONE | `src/combat/realtime_battle.py` | 1.1, 1.2 |
+| 1.5 | Rewrite targeting.py for rank-based logic (melee=front, ranged=any, front_two) | Claude | DONE | `src/combat/targeting.py` | 1.1 |
+| 1.6 | Simplify Projectile to targeted flight (fly to target rank, no collision grid) | Claude | DONE | `src/combat/projectile.py` | 1.1 |
+| 1.7 | Rewrite combat_state.py: wire ATB battle, remove WASD, render units at rank positions, speed bar rendering | Claude | DONE | `src/states/combat_state.py` | 1.1–1.6 |
+| 1.8 | Update abilities.json with `range` field + 5 new abilities from potentialabilitiesplan.md | Claude | DONE | `data/abilities.json` | 1.3 |
+| 1.9 | Update characters.json with `default_rank` + 2nd abilities per character | Claude | DONE | `data/characters.json` | 1.1 |
+| 1.10 | Death rank-slide logic (when front dies, back units shift forward) | Claude | DONE | `src/combat/realtime_battle.py` | 1.4 |
+| 1.11 | Add `default_rank` field to CharacterData entity | Claude | DONE | `src/entities/character.py` | 1.9 |
+| 1.12 | Rewrite AIController (remove positioning, keep rank-aware ability usage) | Claude | DONE | `src/combat/ai_controller.py` | 1.4 |
+| 1.13 | Push/pull/self_move/atb_delay effect resolution in battle engine | Claude | DONE | `src/combat/realtime_battle.py` | 1.4, 1.10 |
+| 1.14 | Support ability resolution (block grant, ally targeting) | Claude | DONE | `src/combat/realtime_battle.py` | 1.4 |
 
-**Sprint 1 Milestone**: Player moves with WASD, auto-attacks fly as projectiles, enemies take damage and can be defeated.
+**Sprint 1 Milestone**: Speed bars fill, units auto-attack at their rank, projectiles fly to targets, damage applies, rank-slide on death, win/lose transitions work. New abilities: Grasping Shadows (pull), Cleaving Flame (front_two), Mana Shield (block), Frightful Roar (ATB delay), Piercing Arrow (front_two + armor pierce).
 
 ---
 
-## Sprint 2: Gameplay Layer (Parallel)
+## Sprint 2: Visual & Polish (Parallel)
 
 | # | Task | Owner | Status | Files | Depends On |
 |---|------|-------|--------|-------|------------|
-| 2.1 | AI controller (ally positioning + abilities) | Claude | DONE | `src/combat/ai_controller.py` | 1.6 |
-| 2.2 | Player ability firing (click/keyboard) | Claude | DONE | `src/states/combat_state.py` | 1.7, 1.8 |
-| 2.3 | Cooldown system (per-unit ability timers) | Claude | DONE | `src/combat/realtime_battle.py` | 1.6 |
-| 2.4 | Passive effects in real-time context | Claude | DONE | `src/combat/realtime_battle.py` | 1.6 |
-| 2.5 | Victory/defeat transitions | Claude | DONE | `src/states/combat_state.py`, `realtime_battle.py` | 1.7 |
-| 2.6 | Ability HUD (icons, cooldown overlay, hotkeys) | Gemini | DONE | `src/ui/ability_hud.py` | 1.7 |
-| 2.7 | Projectile sprites per class/ability | Gemini | DONE | `character assets/`, configs | 1.1 |
-| 2.8 | Unit rendering at x,y with IdleAnimator | Gemini | DONE | `src/states/combat_state.py` (draw) | 1.7 DONE |
-| 2.9 | Projectile trail + impact particles | Gemini | DONE | `src/animation/particles.py` | 1.1 |
-| 2.10 | Ability impact animations at hit position | Gemini | DONE | `src/animation/ability_animator.py` | 1.7 DONE |
-| 2.11 | HP bars above units at their position | Gemini | DONE | `src/states/combat_state.py` (draw) | 2.8 |
+| 2.1 | Speed bar UI widget (per-unit, class-colored, fill animation) | Gemini | DONE | `src/ui/speed_bar.py` (new) | 1.7 DONE |
+| 2.2 | Rank-based unit rendering (proper sprites at rank positions, stagger) | Gemini | TODO | `src/states/combat_state.py` (draw) | 1.7 DONE |
+| 2.3 | Ability HUD update (adapt for rank targeting context, 2 abilities per char) | Gemini | TODO | `src/ui/ability_hud.py` | 1.7 DONE |
+| 2.4 | Projectile flight animation (smooth travel between ranks) | Gemini | TODO | `src/states/combat_state.py` (draw) | 1.6 DONE |
+| 2.5 | HP bars above units at rank positions | Gemini | TODO | `src/states/combat_state.py` (draw) | 2.2 |
 
-**Sprint 2 Milestone**: Full combat with abilities, AI allies, proper visuals, and HUD.
+**Sprint 2 Milestone**: Full ATB combat with polished speed bar UI, rank rendering, and proper visuals.
 
 ---
 
@@ -49,14 +47,14 @@
 
 | # | Task | Owner | Status | Files | Depends On |
 |---|------|-------|--------|-------|------------|
-| 3.1 | Balance attack/projectile speeds | Both | DONE | `config.py`, `data/` | Sprint 2 |
-| 3.2 | Combat background (side-scroller style) | Gemini | DONE | `combat_state.py` | Sprint 2 |
-| 3.3 | Player-controlled unit highlight/indicator | Gemini | DONE | `combat_state.py` | 2.8 |
-| 3.4 | Enemy projectile dodge feedback | Gemini | DONE | particles, animations | 2.9 |
-| 3.5 | Boss fight support (large sprites, patterns) | Claude | DONE | `realtime_battle.py`, `combat_state.py` | Sprint 2 |
-| 3.6 | Relic/mod integration with real-time | Claude | DONE | `realtime_battle.py` | Sprint 2 |
-| 3.7 | Death animations and cleanup | Both | DONE | `combat_state.py`, particles | Sprint 2 |
-| 3.8 | Run-manager HP sync after combat | Claude | DONE | `combat_state.py` | 2.5 |
+| 3.1 | Balance speed scaling, damage, cooldowns, rank advantages | Both | TODO | `config.py`, `data/` | Sprint 2 |
+| 3.2 | Combat background (Darkest Dungeon corridor style) | Gemini | TODO | `combat_state.py` | Sprint 2 |
+| 3.3 | "Ready!" flash / turn indicator when speed bar fills | Gemini | TODO | `combat_state.py`, UI | 2.1 |
+| 3.4 | Rank push/pull slide animation | Gemini | TODO | `src/animation/combat_animator.py` | 1.13 |
+| 3.5 | Death animation + rank collapse visual (units slide forward) | Both | TODO | `combat_state.py`, `particles.py` | 1.10 |
+| 3.6 | Boss fight support (large sprites, multi-rank, special patterns) | Claude | TODO | `realtime_battle.py`, `combat_state.py` | Sprint 2 |
+| 3.7 | Relic/mod integration with ATB system | Claude | TODO | `realtime_battle.py` | Sprint 2 |
+| 3.8 | Run-manager HP sync after ATB combat | Claude | TODO | `combat_state.py` | Sprint 1 |
 
 ---
 
@@ -64,11 +62,13 @@
 
 | # | Task | Notes |
 |---|------|-------|
-| B.1 | Melee enemies that advance into player zone | Requires enemy movement AI |
-| B.2 | Multi-tile bosses with attack patterns | Boss-specific projectile sequences |
-| B.3 | Multiplayer (second player controls ally) | Swap AI controller for input handler |
-| B.4 | Sound effects | Attack, hit, ability, death, dodge |
-| B.5 | Screen-relative parallax background | Depth layers scrolling at different rates |
+| B.1 | Position swap ability (player can rearrange their team mid-combat) | Strategic depth |
+| B.2 | Taunt mechanic (force enemies to target specific rank) | Tank role |
+| B.3 | Multi-rank bosses (occupy positions 1-2, wider sprite) | Boss variety |
+| B.4 | Speed buff/debuff abilities (haste/slow fill rate) | ATB manipulation |
+| B.5 | Sound effects (attack, hit, ability, death, speed bar ding) | Audio |
+| B.6 | Multiplayer (second player controls a different party member) | Coop |
+| B.7 | Remaining abilities from potentialabilitiesplan.md (Void Step, Holy Provocation, Ignite, Bloodlust Charge, Caltrops, enemy abilities) | More depth |
 
 ---
 
@@ -77,11 +77,12 @@
 | File | Primary Owner | Secondary | Rule |
 |------|--------------|-----------|------|
 | `combat_state.py` | Claude (Sprint 1) | Gemini (Sprint 2+) | Claude finishes structural rewrite before Gemini touches draw methods |
-| `config.py` | Claude | Gemini | Claude uses `# Real-time combat` section; Gemini uses `# Visual tuning` section |
+| `config.py` | Claude | Gemini | Claude uses `# ATB combat` section; Gemini uses `# Visual tuning` section |
 | `abilities.json` | Claude | Gemini | Claude owns schema (field names); Gemini tunes visual values (sprites, tints) |
 | `particles.py` | Gemini | Claude | Gemini owns new presets; Claude may call spawn functions |
 | `ability_animator.py` | Gemini | — | Gemini only |
 | `ability_hud.py` | Gemini | — | Gemini only |
+| `speed_bar.py` | Gemini | — | Gemini only (new file) |
 
 ---
 
@@ -91,9 +92,6 @@ _Record major milestones and blockers here:_
 
 | Date | Agent | Note |
 |------|-------|------|
-| 2026-03-09 | Claude | Sprint 1 complete + Sprint 2 tasks 2.1-2.5 done. All engine/logic tasks finished. Gemini tasks (2.6-2.11) ready to start. |
-| 2026-03-09 | Gemini | Started tasks 2.6-2.11. |
-| 2026-03-09 | Gemini | Completed tasks 2.6-2.11. Sprint 2 milestone reached! UI/HUD and all visual effects (particles, animations, sprites) integrated. |
-| 2026-03-09 | Gemini | Started Sprint 3 tasks (3.1, 3.2, 3.3, 3.4, 3.7). |
-| 2026-03-09 | Gemini | Completed visual Polish & Balance tasks (3.1, 3.2, 3.3, 3.4, 3.7) for Sprint 3. |
-| 2026-03-09 | Claude | Sprint 3 tasks 3.5, 3.6, 3.8 DONE. Fixed critical bug: armor was not applied in real-time damage calc. Added piercing mod support. Boss fires 3-projectile spread pattern. HP sync already wired. |
+| 2026-03-09 | — | ATB Lane Combat pivot planned. Previous side-scroller sprints archived. |
+| 2026-03-09 | Gemini | Sprint 2 task 2.1 (speed_bar.py) completed. |
+| 2026-03-09 | Claude | Sprint 1 COMPLETE (1.1–1.14). ATB engine, rank system, targeting, projectiles, all new abilities (Grasping Shadows, Cleaving Flame, Mana Shield, Frightful Roar, Piercing Arrow), push/pull/atb_delay effects, support abilities, AI controller, combat_state.py rewrite. Smoke tested — all imports pass, 5-second simulated battle runs correctly. |

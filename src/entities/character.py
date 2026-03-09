@@ -37,9 +37,11 @@ class CharacterData:
     unlocked: bool
     description: str
     idle_config: IdleConfig = field(default_factory=IdleConfig)
+    default_rank: int = 2
 
     @classmethod
     def from_dict(cls, data: dict) -> "CharacterData":
         d = dict(data)
         idle_cfg = IdleConfig.from_dict(d.pop("idle_config", {}))
-        return cls(**d, idle_config=idle_cfg)
+        default_rank = d.pop("default_rank", 2)
+        return cls(**d, idle_config=idle_cfg, default_rank=default_rank)

@@ -4,6 +4,7 @@
         "name": "Shadow Bolt",
         "description": "Hurls a bolt of dark energy at a single enemy.",
         "targeting": "single_enemy",
+        "range": "ranged",
         "base_damage": 15,
         "scaling": 1.0,
         "cooldown": 3.0,
@@ -25,14 +26,41 @@
         }
     },
     {
+        "id": "grasping_shadows",
+        "name": "Grasping Shadows",
+        "description": "Tendrils of shadow drag a back-line enemy to the front.",
+        "targeting": "single_enemy",
+        "range": "ranged",
+        "base_damage": 6,
+        "scaling": 0.5,
+        "cooldown": 5.0,
+        "effects": [{"type": "pull", "value": 2}],
+        "icon": "UI/ability_icons/Icon20.png",
+        "animation": {
+            "type": "spell",
+            "frames_dir": "Animations/abilities/Water Spell",
+            "tint": [100, 40, 180],
+            "scale": 80,
+            "duration": 0.6
+        },
+        "projectile": {
+            "speed": 450,
+            "size_w": 28,
+            "size_h": 16,
+            "color": [100, 40, 180],
+            "is_aoe": false
+        }
+    },
+    {
         "id": "shield_bash",
         "name": "Shield Bash",
-        "description": "Smashes the target with a holy shield, stunning them for 1 turn.",
+        "description": "Smashes the target with a holy shield, stunning and pushing them back.",
         "targeting": "single_enemy",
+        "range": "melee",
         "base_damage": 10,
         "scaling": 1.0,
         "cooldown": 4.0,
-        "effects": [{"type": "stun", "duration": 2}],
+        "effects": [{"type": "stun", "duration": 2}, {"type": "push", "value": 1}],
         "icon": "UI/ability_icons/Icon16.png",
         "animation": {
             "type": "spell",
@@ -50,10 +78,37 @@
         }
     },
     {
+        "id": "cleaving_flame",
+        "name": "Cleaving Flame",
+        "description": "A sweeping flame strike that hits the two front-most enemies.",
+        "targeting": "front_two",
+        "range": "melee",
+        "base_damage": 12,
+        "scaling": 0.8,
+        "cooldown": 4.5,
+        "effects": [],
+        "icon": "UI/ability_icons/Icons_Fire Ball.png",
+        "animation": {
+            "type": "spell",
+            "frames_dir": "Animations/abilities/Fire Ball",
+            "tint": [255, 120, 40],
+            "scale": 90,
+            "duration": 0.5
+        },
+        "projectile": {
+            "speed": 600,
+            "size_w": 30,
+            "size_h": 18,
+            "color": [255, 120, 40],
+            "is_aoe": false
+        }
+    },
+    {
         "id": "arcane_blast",
         "name": "Arcane Blast",
         "description": "Unleashes arcane energy that strikes all enemies.",
         "targeting": "all_enemies",
+        "range": "ranged",
         "base_damage": 12,
         "scaling": 1.0,
         "cooldown": 4.5,
@@ -75,10 +130,30 @@
         }
     },
     {
+        "id": "mana_shield",
+        "name": "Mana Shield",
+        "description": "Conjures a magical barrier on an ally, granting block.",
+        "targeting": "single_ally",
+        "range": "ranged",
+        "base_damage": 0,
+        "scaling": 0.0,
+        "cooldown": 5.0,
+        "effects": [{"type": "block", "value": 12}],
+        "icon": "UI/ability_icons/Icon12.png",
+        "animation": {
+            "type": "spell",
+            "frames_dir": "Animations/abilities/Water Spell",
+            "tint": [100, 180, 255],
+            "scale": 70,
+            "duration": 0.5
+        }
+    },
+    {
         "id": "savage_rend",
         "name": "Savage Rend",
         "description": "A vicious slash that rends the target with brutal force.",
         "targeting": "single_enemy",
+        "range": "melee",
         "base_damage": 18,
         "scaling": 1.2,
         "cooldown": 3.0,
@@ -100,10 +175,37 @@
         }
     },
     {
+        "id": "frightful_roar",
+        "name": "Frightful Roar",
+        "description": "A terrifying roar that delays all enemies' speed bars.",
+        "targeting": "all_enemies",
+        "range": "ranged",
+        "base_damage": 0,
+        "scaling": 0.0,
+        "cooldown": 6.0,
+        "effects": [{"type": "atb_delay", "value": 0.4}],
+        "icon": "UI/ability_icons/Icon26.png",
+        "animation": {
+            "type": "spell",
+            "frames_dir": "Animations/abilities/Fire Spell",
+            "tint": [200, 60, 60],
+            "scale": 100,
+            "duration": 0.5
+        },
+        "projectile": {
+            "speed": 800,
+            "size_w": 36,
+            "size_h": 24,
+            "color": [200, 60, 60],
+            "is_aoe": true
+        }
+    },
+    {
         "id": "twin_shot",
         "name": "Twin Shot",
         "description": "Fires two rapid arrows at a single target.",
         "targeting": "single_enemy",
+        "range": "ranged",
         "base_damage": 7,
         "scaling": 0.8,
         "cooldown": 2.0,
@@ -125,10 +227,37 @@
         }
     },
     {
+        "id": "piercing_arrow",
+        "name": "Piercing Arrow",
+        "description": "A powerful arrow that pierces through the front ranks, ignoring half their armor.",
+        "targeting": "front_two",
+        "range": "ranged",
+        "base_damage": 10,
+        "scaling": 0.9,
+        "cooldown": 4.0,
+        "effects": [{"type": "armor_pierce"}],
+        "icon": "UI/ability_icons/Icons_Fire Arrow.png",
+        "animation": {
+            "type": "spell",
+            "frames_dir": "Animations/abilities/Fire Arrow",
+            "tint": [180, 220, 80],
+            "scale": 80,
+            "duration": 0.5
+        },
+        "projectile": {
+            "speed": 750,
+            "size_w": 20,
+            "size_h": 8,
+            "color": [180, 220, 80],
+            "is_aoe": false
+        }
+    },
+    {
         "id": "summon_cultist",
         "name": "Summon Cultist",
         "description": "Calls forth cultist minions to fight alongside the warlock.",
         "targeting": "self",
+        "range": "ranged",
         "base_damage": 0,
         "scaling": 0.0,
         "cooldown": 7.0,

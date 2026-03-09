@@ -1,7 +1,7 @@
 """Runtime combat unit wrapper — mutable state around static definitions."""
 
 from dataclasses import dataclass, field
-from config import ATTACK_COOLDOWN_BASE, ATTACK_COOLDOWN_SPEED_FACTOR, ATTACK_COOLDOWN_MIN
+from config import ATB_BASE_FILL_RATE, ATB_SPEED_SCALING
 
 
 @dataclass
@@ -15,7 +15,8 @@ class CombatUnit:
     def __init__(self, unit_id: str, name: str, team: str,
                  max_hp: int, strength: int, armor: int, speed: int,
                  ability_ids: list[str], passive: str | None = None,
-                 ability_mods: list[str] | None = None):
+                 ability_mods: list[str] | None = None,
+                 default_rank: int = 1):
         self.id = unit_id
         self.name = name
         self.team = team  # "player" or "enemy"
@@ -29,57 +30,49 @@ class CombatUnit:
         self.passive = passive
         self.ability_mods = ability_mods or []
 
-        # Cooldown tracking: ability_id -> seconds remaining (real-time)
-        self.cooldowns: dict[str, float] = {}
-        self.buffs: list[Buff] = []
-        self.stunned = False
-        self.alive = True
+        # Rank position in the lane (1 = front, 4 = back)
+        self.rank: int = default_rank
 
-        # Track stats for mana surge passive
-        self.turns_alive = 0
-        self.time_alive = 0.0  # seconds alive in real-time combat
+        # ATB speed bar (0.0 → 1.0, fires auto-attack when full)
+        self.speed_bar: float = 0.0
+        self.speed_bar_fill_rate: float = ATB_BASE_FILL_RATE + speed * ATB_SPEED_SCALING
 
-        # Real-time position (pixel coords, set by combat state)
+        # Rendered position (computed from rank by combat state, not free-move)
         self.x: float = 0.0
         self.y: float = 0.0
 
-        # Auto-attack timer
-        self.attack_interval = max(
-            ATTACK_COOLDOWN_MIN,
-            ATTACK_COOLDOWN_BASE - speed * ATTACK_COOLDOWN_SPEED_FACTOR,
-        )
-        self.attack_timer: float = 0.0
+        # Cooldown tracking: ability_id -> seconds remaining
+        self.cooldowns: dict[str, float] = {}
+        self.buffs: list[Buff] = []
+        self.alive = True
+
+        # Track stats for mana surge passive
+        self.time_alive = 0.0
 
     @property
     def is_stunned(self) -> bool:
         return any(b.type == "stun" and b.duration > 0 for b in self.buffs)
 
-    @property
-    def unit_rect(self) -> "pygame.Rect":
-        import pygame
-        from config import UNIT_HITBOX_W, UNIT_HITBOX_H
-        return pygame.Rect(
-            int(self.x - UNIT_HITBOX_W / 2),
-            int(self.y - UNIT_HITBOX_H / 2),
-            UNIT_HITBOX_W, UNIT_HITBOX_H,
-        )
+    def tick_speed_bar(self, dt: float) -> bool:
+        """Fill the speed bar. Returns True if bar just filled (trigger auto-attack)."""
+        if self.is_stunned:
+            return False
+        self.speed_bar += self.speed_bar_fill_rate * dt
+        if self.speed_bar >= 1.0:
+            self.speed_bar = 0.0
+            return True
+        return False
 
     def tick_cooldowns_rt(self, dt: float):
         """Tick cooldowns by real-time delta (seconds)."""
         for ability_id in list(self.cooldowns):
             self.cooldowns[ability_id] = max(0.0, self.cooldowns[ability_id] - dt)
 
-    def tick_cooldowns(self):
-        """Legacy turn-based tick (kept for compatibility)."""
-        for ability_id in list(self.cooldowns):
-            self.cooldowns[ability_id] = max(0, self.cooldowns[ability_id] - 1)
-
     def tick_buffs_rt(self, dt: float) -> int:
         """Tick buffs in real-time. Returns burn damage if a tick fires."""
         damage = 0
         for buff in self.buffs:
             if buff.type == "burn" and buff.duration > 0:
-                # Burn ticks once per second via timer
                 if not hasattr(buff, '_tick_timer'):
                     buff._tick_timer = 0.0
                 buff._tick_timer += dt
@@ -97,21 +90,15 @@ class CombatUnit:
         self.buffs = [b for b in self.buffs if b.duration > 0]
         return damage
 
-    def tick_buffs(self):
-        """Legacy turn-based tick (kept for compatibility)."""
-        damage = 0
-        for buff in self.buffs:
-            if buff.type == "burn" and buff.duration > 0:
-                damage += int(buff.value)
-            buff.duration -= 1
-        self.buffs = [b for b in self.buffs if b.duration > 0]
-        return damage
-
     def can_use_ability(self, ability_id: str) -> bool:
         return self.cooldowns.get(ability_id, 0) <= 0
 
     def put_on_cooldown(self, ability_id: str, cooldown: float):
         self.cooldowns[ability_id] = float(cooldown)
+
+    def reduce_atb(self, amount: float):
+        """Reduce the speed bar by a flat amount (ATB delay). Clamps to 0."""
+        self.speed_bar = max(0.0, self.speed_bar - amount)
 
     def add_buff(self, buff_type: str, duration: int, value: float = 0):
         self.buffs.append(Buff(type=buff_type, duration=duration, value=value))
@@ -150,9 +137,11 @@ class CombatUnit:
         elif char_data.id == "acoc2":
             passive = "flame_aura"  # reflect 20% damage
         elif char_data.id == "acoc3":
-            passive = "mana_surge"  # +10% ability damage per turn
+            passive = "mana_surge"  # +10% ability damage per 5s
         elif char_data.id == "acoc4":
             passive = "rage"  # +25% damage when below 50% HP
+
+        default_rank = getattr(char_data, 'default_rank', 2)
 
         return cls(
             unit_id=char_data.id,
@@ -165,6 +154,7 @@ class CombatUnit:
             ability_ids=list(char_data.abilities),
             passive=passive,
             ability_mods=ability_mods,
+            default_rank=default_rank,
         )
 
     @classmethod
@@ -178,4 +168,5 @@ class CombatUnit:
             armor=enemy_data.armor,
             speed=enemy_data.speed,
             ability_ids=list(enemy_data.abilities),
+            default_rank=1,  # enemies get sequential ranks assigned externally
         )

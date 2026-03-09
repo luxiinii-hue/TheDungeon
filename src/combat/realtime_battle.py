@@ -1,14 +1,15 @@
-"""Real-time combat engine — replaces turn-based auto_battle.py."""
+"""ATB (Active Time Battle) lane combat engine."""
 
 import random
 from dataclasses import dataclass
 from src.combat.unit import CombatUnit
 from src.combat.ability import AbilityRegistry, AbilityDef
-from src.combat.targeting import get_nearest_enemy, get_targets
+from src.combat.targeting import get_auto_attack_target, get_targets
 from src.combat.projectile import Projectile
 from config import (
-    PROJECTILE_BASE_SPEED, PROJECTILE_ABILITY_SPEED,
-    DAMAGE_ARMOR_FACTOR, CLASS_ATTACK_SPRITES
+    PROJECTILE_TRAVEL_SPEED, PROJECTILE_ABILITY_SPEED,
+    DAMAGE_ARMOR_FACTOR, CLASS_ATTACK_SPRITES,
+    PLAYER_RANK_X, ENEMY_RANK_X, COMBAT_Y_CENTER, RANK_Y_STAGGER,
 )
 
 
@@ -16,7 +17,8 @@ from config import (
 class BattleAction:
     """Event emitted by the battle engine for the UI to consume."""
     type: str  # "attack", "ability", "hit", "dodge", "defeat", "victory",
-               # "lose", "burn_tick", "stun_applied", "reflect", "summon"
+               # "lose", "burn_tick", "stun_applied", "reflect", "summon",
+               # "rank_slide"
     source: str = ""
     target: str = ""
     ability_name: str = ""
@@ -35,6 +37,16 @@ CLASS_ATTACK_COLORS = {
 }
 
 
+def rank_to_pos(rank: int, team: str) -> tuple[float, float]:
+    """Convert a rank (1-4) and team to screen x,y coordinates."""
+    if team == "player":
+        x = PLAYER_RANK_X[min(rank, len(PLAYER_RANK_X) - 1)]
+    else:
+        x = ENEMY_RANK_X[min(rank, len(ENEMY_RANK_X) - 1)]
+    y = COMBAT_Y_CENTER + (rank - 1) * RANK_Y_STAGGER
+    return float(x), float(y)
+
+
 class RealtimeBattle:
     def __init__(self, player_units: list[CombatUnit],
                  enemy_units: list[CombatUnit],
@@ -50,18 +62,53 @@ class RealtimeBattle:
         self.result: str | None = None
         self._actions: list[BattleAction] = []
 
+        # Assign sequential ranks and set initial positions
+        self._assign_ranks(self.player_units)
+        self._assign_ranks(self.enemy_units)
+        self._sync_positions()
+
     @property
     def all_units(self) -> list[CombatUnit]:
         return self.player_units + self.enemy_units
 
+    def _assign_ranks(self, units: list[CombatUnit]):
+        """Assign sequential ranks 1..N to alive units, sorted by default_rank."""
+        alive = [u for u in units if u.alive]
+        alive.sort(key=lambda u: u.rank)
+        for i, u in enumerate(alive):
+            u.rank = i + 1
+
+    def _sync_positions(self):
+        """Set unit x,y from their rank."""
+        for unit in self.all_units:
+            unit.x, unit.y = rank_to_pos(unit.rank, unit.team)
+
+    def _slide_ranks(self, team_units: list[CombatUnit]):
+        """After a death, slide surviving units forward (close rank gaps)."""
+        alive = [u for u in team_units if u.alive]
+        alive.sort(key=lambda u: u.rank)
+        changed = False
+        for i, u in enumerate(alive):
+            new_rank = i + 1
+            if u.rank != new_rank:
+                old_rank = u.rank
+                u.rank = new_rank
+                u.x, u.y = rank_to_pos(new_rank, u.team)
+                self._actions.append(BattleAction(
+                    type="rank_slide", target=u.name,
+                    message=f"{u.name} moves to rank {new_rank}",
+                ))
+                changed = True
+        return changed
+
     def update(self, dt: float) -> list[BattleAction]:
-        """Main per-frame update. Returns actions generated this frame."""
+        """Main per-frame ATB tick. Returns actions generated this frame."""
         if self.result is not None:
             return []
 
         self._actions = []
 
-        # Tick all units
+        # Tick all living units
         for unit in self.all_units:
             if not unit.alive:
                 continue
@@ -82,28 +129,25 @@ class RealtimeBattle:
                         type="defeat", target=unit.name,
                         message=f"{unit.name} has been defeated!",
                     ))
-                    self._check_result()
+                    self._handle_death(unit)
 
-            if unit.is_stunned:
-                continue
-
-            # Auto-attack timer (skip for player-controlled unit — they auto-attack too)
-            unit.attack_timer += dt
-            if unit.attack_timer >= unit.attack_interval:
-                unit.attack_timer -= unit.attack_interval
+            # ATB speed bar tick
+            if unit.alive and unit.tick_speed_bar(dt):
                 self._spawn_auto_attack(unit)
 
-        # Update projectiles
+        # Update projectiles and check arrivals
         for proj in self.projectiles:
+            if not proj.alive:
+                continue
             proj.update(dt)
-
-        # Check collisions
-        self._check_collisions()
+            if proj.arrived:
+                self._apply_projectile_hit(proj)
+                proj.alive = False
 
         # Remove dead projectiles
         self.projectiles = [p for p in self.projectiles if p.alive]
 
-        # Check result
+        # Check win/lose
         self._check_result()
 
         return self._actions
@@ -128,23 +172,39 @@ class RealtimeBattle:
             unit.put_on_cooldown(ability_id, ability.cooldown)
             return True
 
-        # Spawn ability projectile
-        targets = get_targets(ability.targeting, unit, allies, enemies)
+        # Get targets based on rank targeting
+        targets = get_targets(ability.targeting, unit, allies, enemies,
+                              ability_range=ability.range)
         if not targets:
             return False
 
-        self._spawn_ability_projectile(unit, ability, targets[0])
+        # Handle support abilities that don't spawn projectiles
+        if ability.targeting in ("single_ally", "all_allies"):
+            self._execute_support_ability(unit, ability, targets)
+            unit.put_on_cooldown(ability_id, ability.cooldown)
+            return True
+
+        # Spawn ability projectile(s)
+        if ability.targeting == "all_enemies":
+            # AoE: one projectile that hits all
+            self._spawn_ability_projectile(unit, ability, targets[0], is_aoe=True)
+        elif ability.targeting == "front_two":
+            # Hits ranks 1 and 2 — spawn one projectile per target
+            for t in targets:
+                self._spawn_ability_projectile(unit, ability, t)
+        else:
+            self._spawn_ability_projectile(unit, ability, targets[0])
+
         unit.put_on_cooldown(ability_id, ability.cooldown)
         return True
 
     def _spawn_auto_attack(self, unit: CombatUnit):
         """Spawn an auto-attack projectile from a unit."""
         enemies = self.enemy_units if unit.team == "player" else self.player_units
-        target = get_nearest_enemy(unit, enemies)
+        target = get_auto_attack_target(unit, enemies)
         if not target:
             return
 
-        direction = 1 if unit.team == "player" else -1
         damage = self._calc_auto_damage(unit)
         color = CLASS_ATTACK_COLORS.get(unit.id, (200, 180, 120))
 
@@ -155,31 +215,27 @@ class RealtimeBattle:
         if sprite_path and self.asset_manager:
             try:
                 sprite_surf = self.asset_manager.get_scaled(sprite_path, size[0], size[1])
-                if direction == -1:
+                if unit.team == "enemy":
+                    import pygame
                     sprite_surf = pygame.transform.flip(sprite_surf, True, False)
             except Exception:
                 pass
 
-        # Boss spread attack: fire 3 projectiles with vertical spread
-        is_boss = getattr(unit, '_is_boss', False)
-        offsets = [0, -40, 40] if is_boss else [0]
-
-        for y_offset in offsets:
-            proj = Projectile(
-                x=unit.x + direction * 40,
-                y=unit.y + y_offset,
-                direction=direction,
-                speed=PROJECTILE_BASE_SPEED,
-                damage=damage,
-                source_name=unit.name,
-                team=unit.team,
-                color=color,
-                size=size,
-                sprite=sprite_surf,
-            )
-            proj.ability_mods = list(unit.ability_mods)
-            proj.passive = unit.passive
-            self.projectiles.append(proj)
+        proj = Projectile(
+            x=unit.x, y=unit.y,
+            target_x=target.x, target_y=target.y,
+            speed=PROJECTILE_TRAVEL_SPEED,
+            damage=damage,
+            source_name=unit.name,
+            team=unit.team,
+            color=color,
+            size=size,
+            sprite=sprite_surf,
+        )
+        proj.ability_mods = list(unit.ability_mods)
+        proj.passive = unit.passive
+        proj.target_name = target.name
+        self.projectiles.append(proj)
 
         self._actions.append(BattleAction(
             type="attack", source=unit.name,
@@ -187,31 +243,28 @@ class RealtimeBattle:
         ))
 
     def _spawn_ability_projectile(self, unit: CombatUnit, ability: AbilityDef,
-                                  target: CombatUnit):
+                                  target: CombatUnit, is_aoe: bool = False):
         """Spawn a projectile for an ability."""
-        direction = 1 if unit.team == "player" else -1
         damage = self._calc_ability_damage(unit, ability)
 
-        # Use ability projectile config or defaults
         pc = ability.projectile
         speed = pc.speed if pc else PROJECTILE_ABILITY_SPEED
         size = (pc.size_w, pc.size_h) if pc else (20, 12)
         color = pc.color if pc else (255, 200, 80)
-        is_aoe = pc.is_aoe if pc else (ability.targeting == "all_enemies")
 
         sprite_surf = None
         if pc and pc.sprite and self.asset_manager:
             try:
                 sprite_surf = self.asset_manager.get_scaled(pc.sprite, size[0], size[1])
-                if direction == -1:
+                if unit.team == "enemy":
+                    import pygame
                     sprite_surf = pygame.transform.flip(sprite_surf, True, False)
             except Exception:
                 pass
 
         proj = Projectile(
-            x=unit.x + direction * 40,
-            y=unit.y,
-            direction=direction,
+            x=unit.x, y=unit.y,
+            target_x=target.x, target_y=target.y,
             speed=speed,
             damage=damage,
             source_name=unit.name,
@@ -224,7 +277,7 @@ class RealtimeBattle:
         proj.ability_mods = list(unit.ability_mods)
         proj.passive = unit.passive
         proj.is_aoe = is_aoe
-        # Store effects for application on hit
+        proj.target_name = target.name
         proj._ability_effects = ability.effects
         self.projectiles.append(proj)
 
@@ -235,7 +288,7 @@ class RealtimeBattle:
         ))
 
     def _execute_self_ability(self, unit: CombatUnit, ability: AbilityDef):
-        """Handle self-targeting abilities (summon, buffs)."""
+        """Handle self-targeting abilities (summon, buffs, self_move)."""
         for effect in ability.effects:
             if effect.type == "summon":
                 self._actions.append(BattleAction(
@@ -244,37 +297,100 @@ class RealtimeBattle:
                     damage=effect.value,
                     message=f"{unit.name} summons reinforcements!",
                 ))
+            elif effect.type == "self_move":
+                self._apply_position_effect(unit, unit, effect.type, effect.value)
         self._actions.append(BattleAction(
             type="ability", source=unit.name, target=unit.name,
             ability_name=ability.name,
             message=f"{unit.name} uses {ability.name}!",
         ))
 
-    def _check_collisions(self):
-        """Check projectile-unit collisions."""
-        for proj in self.projectiles:
-            if not proj.alive:
-                continue
+    def _execute_support_ability(self, unit: CombatUnit, ability: AbilityDef,
+                                  targets: list[CombatUnit]):
+        """Handle ally-targeting support abilities (block, heals)."""
+        for target in targets:
+            for effect in ability.effects:
+                if effect.type == "block":
+                    target.block += effect.value
+                    self._actions.append(BattleAction(
+                        type="hit", source=unit.name, target=target.name,
+                        ability_name=ability.name,
+                        message=f"{target.name} gains {effect.value} block!",
+                    ))
+                elif effect.type == "heal":
+                    healed = min(effect.value, target.max_hp - target.hp)
+                    target.hp += healed
+                    self._actions.append(BattleAction(
+                        type="hit", source=unit.name, target=target.name,
+                        ability_name=ability.name, heal=healed,
+                        message=f"{target.name} healed for {healed}!",
+                    ))
+        self._actions.append(BattleAction(
+            type="ability", source=unit.name,
+            ability_name=ability.name,
+            message=f"{unit.name} uses {ability.name}!",
+        ))
 
-            # Determine targets (opposing team)
+    def _apply_position_effect(self, source: CombatUnit, target: CombatUnit,
+                                effect_type: str, value: int):
+        """Handle push, pull, and self_move rank changes."""
+        team_units = (self.player_units if target.team == "player"
+                      else self.enemy_units)
+        alive = [u for u in team_units if u.alive]
+        max_rank = len(alive)
+
+        if effect_type == "push":
+            new_rank = min(max_rank, target.rank + value)
+        elif effect_type == "pull":
+            new_rank = max(1, target.rank - value)
+        elif effect_type == "self_move":
+            # Positive = forward (lower rank), negative = backward
+            new_rank = max(1, min(max_rank, target.rank - value))
+        else:
+            return
+
+        if new_rank == target.rank:
+            return
+
+        # Find unit currently at the destination rank and swap
+        occupant = next((u for u in alive if u.rank == new_rank), None)
+        old_rank = target.rank
+        if occupant and occupant != target:
+            occupant.rank = old_rank
+            occupant.x, occupant.y = rank_to_pos(old_rank, occupant.team)
+            self._actions.append(BattleAction(
+                type="rank_slide", target=occupant.name,
+                message=f"{occupant.name} swaps to rank {old_rank}",
+            ))
+
+        target.rank = new_rank
+        target.x, target.y = rank_to_pos(new_rank, target.team)
+        direction = "forward" if new_rank < old_rank else "back"
+        self._actions.append(BattleAction(
+            type="rank_slide", target=target.name,
+            message=f"{target.name} pushed {direction} to rank {new_rank}",
+        ))
+
+    def _apply_projectile_hit(self, proj: Projectile):
+        """Apply damage when a projectile arrives at its target."""
+        if proj.is_aoe:
+            # Hit all alive enemies on the opposing team
             targets = self.enemy_units if proj.team == "player" else self.player_units
-            hit_units = []
-
-            for unit in targets:
-                if not unit.alive:
-                    continue
-                if proj.hits(unit.unit_rect):
-                    hit_units.append(unit)
-                    if not proj.is_aoe:
-                        break  # single-target stops at first hit
-
-            for unit in hit_units:
-                self._apply_hit(proj, unit)
-
-            if hit_units and not proj.is_aoe:
-                proj.alive = False
-            elif hit_units and proj.is_aoe:
-                proj.alive = False  # AoE also consumed, but hit everyone in path
+            for target in targets:
+                if target.alive:
+                    self._apply_hit(proj, target)
+        else:
+            # Hit the named target (if still alive)
+            target = self._find_unit(proj.target_name)
+            if target and target.alive:
+                self._apply_hit(proj, target)
+            else:
+                # Target died in transit — hit front-most enemy instead
+                enemies = self.enemy_units if proj.team == "player" else self.player_units
+                alive = [u for u in enemies if u.alive]
+                if alive:
+                    fallback = min(alive, key=lambda u: u.rank)
+                    self._apply_hit(proj, fallback)
 
     def _apply_hit(self, proj: Projectile, target: CombatUnit):
         """Apply projectile damage to a target unit."""
@@ -287,14 +403,17 @@ class RealtimeBattle:
             ))
             return
 
-        # Apply armor reduction to damage
+        # Apply armor reduction
         effective_armor = target.armor
-        if "piercing" in proj.ability_mods:
+        has_pierce = "piercing" in proj.ability_mods
+        if hasattr(proj, '_ability_effects'):
+            if any(e.type == "armor_pierce" for e in proj._ability_effects):
+                has_pierce = True
+        if has_pierce:
             effective_armor = int(effective_armor * 0.5)
         final_damage = max(1, proj.damage - int(effective_armor * DAMAGE_ARMOR_FACTOR))
         actual = target.take_damage(final_damage)
 
-        # Find source unit for reflect/vampiric
         source_unit = self._find_unit(proj.source_name)
 
         # Flame aura reflect
@@ -309,13 +428,12 @@ class RealtimeBattle:
             heal = max(1, int(actual * 0.2))
             source_unit.hp = min(source_unit.max_hp, source_unit.hp + heal)
 
-        action_type = "hit"
         msg = f"{proj.source_name} hits {target.name} for {actual} damage!"
         if proj.ability_name:
             msg = f"{proj.ability_name} hits {target.name} for {actual} damage!"
 
         self._actions.append(BattleAction(
-            type=action_type, source=proj.source_name, target=target.name,
+            type="hit", source=proj.source_name, target=target.name,
             ability_name=proj.ability_name, damage=actual, heal=heal,
             message=msg,
         ))
@@ -337,6 +455,19 @@ class RealtimeBattle:
                         target=target.name,
                         message=f"{target.name} is stunned for {effect.duration}s!",
                     ))
+                elif effect.type in ("push", "pull"):
+                    self._apply_position_effect(
+                        self._find_unit(proj.source_name) or target,
+                        target, effect.type, effect.value)
+                elif effect.type == "atb_delay":
+                    target.reduce_atb(effect.value)
+                    self._actions.append(BattleAction(
+                        type="hit", source=proj.source_name,
+                        target=target.name,
+                        message=f"{target.name}'s speed bar reduced!",
+                    ))
+                elif effect.type == "armor_pierce":
+                    pass  # Handled via proj flag below
 
         # Burning mod
         if "burning" in proj.ability_mods:
@@ -347,23 +478,32 @@ class RealtimeBattle:
                 message=f"{target.name} is burning!",
             ))
 
-        # Check defeat
+        # Check defeats
         if not target.alive:
             self._actions.append(BattleAction(
                 type="defeat", target=target.name,
                 message=f"{target.name} has been defeated!",
             ))
+            self._handle_death(target)
 
         if source_unit and not source_unit.alive:
             self._actions.append(BattleAction(
                 type="defeat", target=source_unit.name,
                 message=f"{source_unit.name} has been defeated!",
             ))
+            self._handle_death(source_unit)
+
+    def _handle_death(self, unit: CombatUnit):
+        """Handle rank sliding when a unit dies."""
+        if unit.team == "player":
+            self._slide_ranks(self.player_units)
+        else:
+            self._slide_ranks(self.enemy_units)
+        self._check_result()
 
     def _calc_auto_damage(self, unit: CombatUnit) -> int:
-        """Calculate auto-attack damage (no armor applied here — applied on hit)."""
+        """Calculate auto-attack damage (before armor — applied on hit)."""
         raw = max(1, unit.strength)
-        # Rage passive
         if unit.passive == "rage" and unit.hp < unit.max_hp * 0.5:
             raw = int(raw * 1.25)
         return raw
@@ -371,12 +511,9 @@ class RealtimeBattle:
     def _calc_ability_damage(self, unit: CombatUnit, ability: AbilityDef) -> int:
         """Calculate ability damage (before armor)."""
         raw = ability.base_damage + int(unit.strength * ability.scaling)
-        # Piercing mod reduces armor effect — handled on hit
-        # Mana surge passive: +10% per 5 seconds alive
         if unit.passive == "mana_surge":
             bonus = 1.0 + 0.1 * int(unit.time_alive / 5.0)
             raw = int(raw * bonus)
-        # Rage passive
         if unit.passive == "rage" and unit.hp < unit.max_hp * 0.5:
             raw = int(raw * 1.25)
         return raw

@@ -68,25 +68,27 @@ MAP_NODE_RADIUS = 22
 MAP_NODE_SPACING_X = 200
 MAP_NODE_SPACING_Y = 120
 
-# Real-time combat
-PLAYER_ZONE_X_MIN = 40
-PLAYER_ZONE_X_MAX = 400
-PLAYER_ZONE_Y_MIN = 100
-PLAYER_ZONE_Y_MAX = 580
-ENEMY_ZONE_X_MIN = 880
-ENEMY_ZONE_X_MAX = 1240
-ENEMY_ZONE_Y_MIN = 100
-ENEMY_ZONE_Y_MAX = 580
-PLAYER_MOVE_SPEED = 250  # Increased for snappier dodging
-PROJECTILE_BASE_SPEED = 700  # Faster auto-attacks
-PROJECTILE_ABILITY_SPEED = 600
-ATTACK_COOLDOWN_BASE = 2.0  # Slightly faster base attacks
-ATTACK_COOLDOWN_SPEED_FACTOR = 0.3
-ATTACK_COOLDOWN_MIN = 0.4
-UNIT_HITBOX_W = 60
-UNIT_HITBOX_H = 120
+# ATB Lane Combat
+# Rank x-positions: index 0 unused, ranks 1(front)–4(back)
+PLAYER_RANK_X = [0, 370, 280, 190, 100]
+ENEMY_RANK_X = [0, 910, 1000, 1090, 1180]
+COMBAT_Y_CENTER = 330
+RANK_Y_STAGGER = 10  # slight y offset per rank for depth
+
+# ATB speed bar fill
+ATB_BASE_FILL_RATE = 0.25   # bar fill/sec at speed 0
+ATB_SPEED_SCALING = 0.06    # additional fill/sec per speed point
+
+# Projectiles (targeted flight — no collision grid)
+PROJECTILE_TRAVEL_SPEED = 600
+PROJECTILE_ABILITY_SPEED = 500
 
 # Visual tuning (Gemini section)
+SPEED_BAR_WIDTH = 80
+SPEED_BAR_HEIGHT = 8
+SPEED_BAR_BG_COLOR = (40, 40, 45)
+SPEED_BAR_BORDER_COLOR = (20, 20, 25)
+SPEED_BAR_FILL_COLOR_READY = (255, 215, 0) # Gold when full
 
 # Class colors (for UI badges)
 CLASS_COLORS = {
