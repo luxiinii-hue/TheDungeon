@@ -138,7 +138,7 @@
         "base_damage": 0,
         "scaling": 0.0,
         "cooldown": 5.0,
-        "effects": [{"type": "block", "value": 12}],
+        "effects": [{"type": "block", "value": 15}],
         "icon": "UI/ability_icons/Icon12.png",
         "animation": {
             "type": "spell",
@@ -253,6 +253,58 @@
         }
     },
     {
+        "id": "abyssal_smash",
+        "name": "Abyssal Smash",
+        "description": "A devastating sweeping strike that stuns the two front-most enemies.",
+        "targeting": "front_two",
+        "range": "melee",
+        "base_damage": 16,
+        "scaling": 1.0,
+        "cooldown": 7.0,
+        "effects": [{"type": "stun", "duration": 2}],
+        "icon": "UI/ability_icons/Icon28.png",
+        "animation": {
+            "type": "tween_slam",
+            "sprite": "Animations/abilities/Nightfang/AoEStun.png",
+            "tint": [120, 40, 180],
+            "scale": 120,
+            "duration": 0.8
+        },
+        "projectile": {
+            "speed": 550,
+            "size_w": 36,
+            "size_h": 24,
+            "color": [120, 40, 180],
+            "is_aoe": false
+        }
+    },
+    {
+        "id": "life_drain",
+        "name": "Life Drain",
+        "description": "Drains life force from a target, healing the caster for the damage dealt.",
+        "targeting": "single_enemy",
+        "range": "ranged",
+        "base_damage": 12,
+        "scaling": 0.8,
+        "cooldown": 5.0,
+        "effects": [{"type": "life_drain"}],
+        "icon": "UI/ability_icons/Icon18.png",
+        "animation": {
+            "type": "spell",
+            "frames_dir": "Animations/abilities/Water Spell",
+            "tint": [180, 40, 180],
+            "scale": 80,
+            "duration": 0.6
+        },
+        "projectile": {
+            "speed": 450,
+            "size_w": 24,
+            "size_h": 14,
+            "color": [180, 40, 180],
+            "is_aoe": false
+        }
+    },
+    {
         "id": "summon_cultist",
         "name": "Summon Cultist",
         "description": "Calls forth cultist minions to fight alongside the warlock.",
@@ -260,7 +312,7 @@
         "range": "ranged",
         "base_damage": 0,
         "scaling": 0.0,
-        "cooldown": 7.0,
+        "cooldown": 9.0,
         "effects": [{"type": "summon", "value": 1, "duration": 0, "enemy_id": "cultist_minion"}],
         "icon": "UI/ability_icons/Icon18.png",
         "animation": {

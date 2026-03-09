@@ -467,7 +467,17 @@ class RealtimeBattle:
                         message=f"{target.name}'s speed bar reduced!",
                     ))
                 elif effect.type == "armor_pierce":
-                    pass  # Handled via proj flag below
+                    pass  # Handled via proj flag above
+                elif effect.type == "life_drain":
+                    if source_unit and actual > 0:
+                        healed = min(actual, source_unit.max_hp - source_unit.hp)
+                        source_unit.hp += healed
+                        self._actions.append(BattleAction(
+                            type="hit", source=source_unit.name,
+                            target=source_unit.name,
+                            heal=healed,
+                            message=f"{source_unit.name} drains {healed} HP!",
+                        ))
 
         # Burning mod
         if "burning" in proj.ability_mods:

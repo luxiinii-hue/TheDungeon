@@ -20,6 +20,7 @@ class RunManager:
         self.relics: list[dict] = []
         self.ability_mods: dict[str, list[str]] = {c.id: [] for c in team}
         self.stat_boosts: dict[str, dict] = {c.id: {} for c in team}
+        self.unlocked_abilities: dict[str, list[str]] = {c.id: [] for c in team}
 
         # Map position
         self.current_node_id: int | None = None
@@ -65,6 +66,12 @@ class RunManager:
         if mod not in self.ability_mods[char_id]:
             self.ability_mods[char_id].append(mod)
 
+    def unlock_ability(self, char_id: str, ability_id: str):
+        """Unlock a new ability for a character during the run."""
+        if char_id in self.unlocked_abilities:
+            if ability_id not in self.unlocked_abilities[char_id]:
+                self.unlocked_abilities[char_id].append(ability_id)
+
     def apply_relic(self, relic: dict):
         """Apply a team-wide relic."""
         self.relics.append(relic)
@@ -79,6 +86,9 @@ class RunManager:
         elif effect == "team_armor":
             for char in self.team:
                 self.apply_stat_boost(char.id, "armor", int(value))
+        elif effect == "team_speed":
+            for char in self.team:
+                self.apply_stat_boost(char.id, "speed", int(value))
 
     def update_hp_after_combat(self, unit_hp: dict[str, int]):
         """Update team HP from combat results. unit_hp maps char_id -> remaining HP."""

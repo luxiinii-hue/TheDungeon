@@ -84,6 +84,11 @@ class RewardState(BaseState):
             run.apply_ability_mod(char_id, reward["effect"])
         elif rtype == "relic":
             run.apply_relic(reward)
+        elif rtype == "ability_unlock":
+            target_char = reward.get("char_id", "")
+            ability_id = reward.get("ability_id", "")
+            if target_char and ability_id:
+                run.unlock_ability(target_char, ability_id)
 
         # Return to map
         self.game.state_machine.transition(GameState.MAP)

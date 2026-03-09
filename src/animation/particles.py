@@ -157,8 +157,12 @@ def spawn_twin_shot(emitter: ParticleEmitter, x: float, y: float):
 def spawn_death_burst(emitter: ParticleEmitter, x: float, y: float,
                       color: tuple = (200, 50, 50)):
     """Large burst on unit death."""
-    emitter.emit_burst(x, y, 25, color, speed_range=(40, 120),
-                       lifetime=0.8, size_range=(3, 7), gravity=50.0)
+    # Blood burst
+    emitter.emit_burst(x, y, 25, color, speed_range=(40, 150),
+                       lifetime=0.8, size_range=(3, 7), gravity=80.0)
+    # Bone fragment burst (white/grey chunks)
+    emitter.emit_burst(x, y, 15, (230, 230, 220), speed_range=(60, 200),
+                       lifetime=1.0, size_range=(3, 6), gravity=150.0)
 
 
 def spawn_projectile_trail(emitter: ParticleEmitter, x: float, y: float, color: tuple):

@@ -34,10 +34,10 @@
 | # | Task | Owner | Status | Files | Depends On |
 |---|------|-------|--------|-------|------------|
 | 2.1 | Speed bar UI widget (per-unit, class-colored, fill animation) | Gemini | DONE | `src/ui/speed_bar.py` (new) | 1.7 DONE |
-| 2.2 | Rank-based unit rendering (proper sprites at rank positions, stagger) | Gemini | TODO | `src/states/combat_state.py` (draw) | 1.7 DONE |
-| 2.3 | Ability HUD update (adapt for rank targeting context, 2 abilities per char) | Gemini | TODO | `src/ui/ability_hud.py` | 1.7 DONE |
-| 2.4 | Projectile flight animation (smooth travel between ranks) | Gemini | TODO | `src/states/combat_state.py` (draw) | 1.6 DONE |
-| 2.5 | HP bars above units at rank positions | Gemini | TODO | `src/states/combat_state.py` (draw) | 2.2 |
+| 2.2 | Rank-based unit rendering (proper sprites at rank positions, stagger) | Gemini | DONE | `src/states/combat_state.py` (draw) | 1.7 DONE |
+| 2.3 | Ability HUD update (adapt for rank targeting context, 2 abilities per char) | Gemini | DONE | `src/ui/ability_hud.py` | 1.7 DONE |
+| 2.4 | Projectile flight animation (smooth travel between ranks) | Gemini | DONE | `src/states/combat_state.py` (draw) | 1.6 DONE |
+| 2.5 | HP bars above units at rank positions | Gemini | DONE | `src/states/combat_state.py` (draw) | 2.2 |
 
 **Sprint 2 Milestone**: Full ATB combat with polished speed bar UI, rank rendering, and proper visuals.
 
@@ -47,14 +47,14 @@
 
 | # | Task | Owner | Status | Files | Depends On |
 |---|------|-------|--------|-------|------------|
-| 3.1 | Balance speed scaling, damage, cooldowns, rank advantages | Both | TODO | `config.py`, `data/` | Sprint 2 |
-| 3.2 | Combat background (Darkest Dungeon corridor style) | Gemini | TODO | `combat_state.py` | Sprint 2 |
-| 3.3 | "Ready!" flash / turn indicator when speed bar fills | Gemini | TODO | `combat_state.py`, UI | 2.1 |
-| 3.4 | Rank push/pull slide animation | Gemini | TODO | `src/animation/combat_animator.py` | 1.13 |
-| 3.5 | Death animation + rank collapse visual (units slide forward) | Both | TODO | `combat_state.py`, `particles.py` | 1.10 |
-| 3.6 | Boss fight support (large sprites, multi-rank, special patterns) | Claude | TODO | `realtime_battle.py`, `combat_state.py` | Sprint 2 |
-| 3.7 | Relic/mod integration with ATB system | Claude | TODO | `realtime_battle.py` | Sprint 2 |
-| 3.8 | Run-manager HP sync after ATB combat | Claude | TODO | `combat_state.py` | Sprint 1 |
+| 3.1 | Balance speed scaling, damage, cooldowns, rank advantages | Both | DONE | `config.py`, `data/` | Sprint 2 |
+| 3.2 | Combat background (Darkest Dungeon corridor style) | Gemini | DONE | `combat_state.py` | Sprint 2 |
+| 3.3 | "Ready!" flash / turn indicator when speed bar fills | Gemini | DONE | `combat_state.py`, UI | 2.1 |
+| 3.4 | Rank push/pull slide animation | Gemini | DONE | `src/animation/combat_animator.py` | 1.13 |
+| 3.5 | Death animation + rank collapse visual (units slide forward) | Both | DONE | `combat_state.py`, `particles.py` | 1.10 |
+| 3.6 | Boss fight support (large sprites, multi-rank, special patterns) | Claude | DONE | `realtime_battle.py`, `combat_state.py`, `data/abilities.json`, `data/enemies.json` | Sprint 2 |
+| 3.7 | Relic/mod integration with ATB system | Claude | DONE | `run_manager.py`, `data/rewards.json` | Sprint 2 |
+| 3.8 | Run-manager HP sync after ATB combat | Claude | DONE | `combat_state.py` | Sprint 1 |
 
 ---
 
@@ -95,3 +95,6 @@ _Record major milestones and blockers here:_
 | 2026-03-09 | — | ATB Lane Combat pivot planned. Previous side-scroller sprints archived. |
 | 2026-03-09 | Gemini | Sprint 2 task 2.1 (speed_bar.py) completed. |
 | 2026-03-09 | Claude | Sprint 1 COMPLETE (1.1–1.14). ATB engine, rank system, targeting, projectiles, all new abilities (Grasping Shadows, Cleaving Flame, Mana Shield, Frightful Roar, Piercing Arrow), push/pull/atb_delay effects, support abilities, AI controller, combat_state.py rewrite. Smoke tested — all imports pass, 5-second simulated battle runs correctly. |
+| 2026-03-09 | Claude | Added Abyssal Smash (unlockable melee AoE stun for Nightfang). Wired through abilities.json, rewards.json (ability_unlock type), events.json (Abyssal Altar event), RunManager.unlock_ability(), CombatUnit.from_character(unlocked_abilities=), reward_state.py. Uses AoEStun.png asset. |
+| 2026-03-09 | Claude | Sprint 3 Claude tasks DONE (3.6–3.8). Boss: added Life Drain ability for Goblin Warlock (ranged drain + self-heal), wired life_drain effect in battle engine. Relics: wired team_speed effect (Quicksilver Pendant) in RunManager.apply_relic(). HP sync was already done in Sprint 1 (combat_state lines 179-180). |
+| 2026-03-09 | Claude | Balance pass (3.1): DAMAGE_ARMOR_FACTOR 0.5->1.0 (armor is now meaningful flat reduction), ATB_BASE_FILL_RATE 0.25->0.22 + ATB_SPEED_SCALING 0.06->0.08 (wider speed spread, 1.8x ratio from speed 1->4). Shadow Wraith +1 armor, Goblin Mage str 1->2. Enemy rebalance: Fat Fly HP 30->25 (trash), Goblin Brute str 3->4/HP 45->40 (glass cannon brute), Sentinel armor 2->3/HP 50->55 (true tank), Assassin str 4->5/speed 4->5/HP 55->45 (deadly glass cannon), Boss HP 120->160/armor 2->3 (longer fights), Cultist HP 15->20. Mana Shield block 12->15, Summon cd 7->9. Simulated: normal ~9s, elite ~6s, boss ~15s. |

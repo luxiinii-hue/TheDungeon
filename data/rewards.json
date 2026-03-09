@@ -95,5 +95,25 @@
         "value": 5,
         "description": "All allies start combat with 5 block",
         "cost": 75
+    },
+    {
+        "id": "relic_speed",
+        "name": "Quicksilver Pendant",
+        "type": "relic",
+        "rarity": "rare",
+        "effect": "team_speed",
+        "value": 1,
+        "description": "All allies gain +1 speed (faster ATB fill)",
+        "cost": 85
+    },
+    {
+        "id": "abyssal_smash_unlock",
+        "name": "Abyssal Smash",
+        "type": "ability_unlock",
+        "rarity": "rare",
+        "char_id": "acoc4",
+        "ability_id": "abyssal_smash",
+        "description": "Nightfang learns Abyssal Smash — a devastating AoE stun attack",
+        "cost": 0
     }
 ]

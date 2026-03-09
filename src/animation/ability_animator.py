@@ -79,12 +79,27 @@ class MeleeSlashAnimation:
         return self.age < self.duration
 
 
+@dataclass
+class TweenSlamAnimation:
+    """Massive attack that rears up and slams down (like Abyssal Smash)."""
+    sprite: pygame.Surface
+    x: float
+    y: float
+    duration: float
+    age: float = 0.0
+
+    @property
+    def alive(self) -> bool:
+        return self.age < self.duration
+
+
 class AbilityAnimator:
     """Manages active ability animations during combat."""
 
     def __init__(self):
         self.spell_anims: list[SpellAnimation] = []
         self.melee_anims: list[MeleeSlashAnimation] = []
+        self.slam_anims: list[TweenSlamAnimation] = []
         self._frame_cache: dict[str, list[pygame.Surface]] = {}
 
     def _get_frames(self, frames_dir: str, scale: int,
@@ -120,6 +135,37 @@ class AbilityAnimator:
             sprite=img, x=x, y=y, duration=duration,
         ))
 
+    def spawn_tween_slam(self, x: float, y: float, sprite_path: str,
+                         scale: int = 200, duration: float = 0.8,
+                         tint: tuple[int, int, int] | None = None):
+        """Spawn a large tweening slam animation (like Abyssal Smash)."""
+        full_path = os.path.join(ASSET_DIR, sprite_path)
+        if not os.path.exists(full_path):
+            return
+        img = pygame.image.load(full_path).convert_alpha()
+        
+        # The AoEStun.png asset includes Nightfang on the far left. 
+        # We need to crop him out so only the giant claw remains.
+        w, h = img.get_size()
+        if w > 500:
+            # Crop out the left ~300 pixels (Nightfang)
+            crop_rect = pygame.Rect(300, 0, w - 300, h)
+            cropped_img = pygame.Surface(crop_rect.size, pygame.SRCALPHA)
+            cropped_img.blit(img, (0, 0), crop_rect)
+            img = cropped_img
+            w, h = img.get_size()
+            
+        # Scale proportionally
+        aspect = w / h
+        new_w = scale
+        new_h = int(scale / aspect)
+        img = pygame.transform.smoothscale(img, (new_w, new_h))
+        if tint:
+            img = _tint_surface(img, tint)
+        self.slam_anims.append(TweenSlamAnimation(
+            sprite=img, x=x, y=y, duration=duration,
+        ))
+
     def spawn_from_config(self, x: float, y: float, animation_config: dict):
         """Spawn animation from an ability's animation config dict."""
         if not animation_config:
@@ -137,6 +183,9 @@ class AbilityAnimator:
         elif anim_type == "melee_slash":
             sprite = animation_config.get("sprite", "")
             self.spawn_melee(x, y, sprite, scale, duration, tint)
+        elif anim_type == "tween_slam":
+            sprite = animation_config.get("sprite", "")
+            self.spawn_tween_slam(x, y, sprite, scale, duration, tint)
 
     def update(self, dt: float):
         for anim in self.spell_anims:
@@ -146,6 +195,10 @@ class AbilityAnimator:
         for anim in self.melee_anims:
             anim.age += dt
         self.melee_anims = [a for a in self.melee_anims if a.alive]
+        
+        for anim in self.slam_anims:
+            anim.age += dt
+        self.slam_anims = [a for a in self.slam_anims if a.alive]
 
     def draw(self, surface: pygame.Surface):
         # Draw spell animations
@@ -176,4 +229,47 @@ class AbilityAnimator:
             surface.blit(rotated, (
                 int(anim.x + offset_x - rotated.get_width() // 2),
                 int(anim.y + offset_y - rotated.get_height() // 2),
+            ))
+
+        # Draw slam animations
+        for anim in self.slam_anims:
+            progress = anim.age / anim.duration
+            
+            # Phase 1: Windup (0.0 to 0.4) - scale up and rotate back slightly
+            # Phase 2: Slam impact (0.4 to 0.5) - rotate forward fast
+            # Phase 3: Hold & fade (0.5 to 1.0)
+            
+            scale_mult = 1.0
+            angle = 0.0
+            
+            if progress < 0.4:
+                # Windup
+                p = progress / 0.4
+                scale_mult = 0.8 + 0.4 * p  # 0.8 to 1.2
+                angle = 15.0 * p            # rotate back 15 degrees
+            elif progress < 0.5:
+                # Slam down
+                p = (progress - 0.4) / 0.1
+                scale_mult = 1.2 - 0.2 * p  # 1.2 to 1.0
+                angle = 15.0 - 30.0 * p     # swing forward to -15
+            else:
+                # Hold and fade
+                scale_mult = 1.0
+                angle = -15.0
+            
+            # Apply transformations
+            w, h = anim.sprite.get_size()
+            scaled = pygame.transform.smoothscale(anim.sprite, (int(w * scale_mult), int(h * scale_mult)))
+            rotated = pygame.transform.rotate(scaled, angle)
+            
+            # Fade out at the end
+            if progress > 0.7:
+                fade = 1.0 - (progress - 0.7) / 0.3
+                alpha = max(0, int(255 * fade))
+                rotated.set_alpha(alpha)
+                
+            # Offset y so it hits the ground properly
+            surface.blit(rotated, (
+                int(anim.x - rotated.get_width() // 2),
+                int(anim.y - rotated.get_height() + 20), # Anchor bottom near target
             ))

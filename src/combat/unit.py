@@ -118,7 +118,8 @@ class CombatUnit:
 
     @classmethod
     def from_character(cls, char_data, ability_mods: list[str] | None = None,
-                       stat_boosts: dict | None = None) -> "CombatUnit":
+                       stat_boosts: dict | None = None,
+                       unlocked_abilities: list[str] | None = None) -> "CombatUnit":
         max_hp = char_data.max_hp
         strength = char_data.strength
         armor = char_data.armor
@@ -143,6 +144,12 @@ class CombatUnit:
 
         default_rank = getattr(char_data, 'default_rank', 2)
 
+        ability_ids = list(char_data.abilities)
+        if unlocked_abilities:
+            for ab_id in unlocked_abilities:
+                if ab_id not in ability_ids:
+                    ability_ids.append(ab_id)
+
         return cls(
             unit_id=char_data.id,
             name=char_data.name,
@@ -151,7 +158,7 @@ class CombatUnit:
             strength=strength,
             armor=armor,
             speed=speed,
-            ability_ids=list(char_data.abilities),
+            ability_ids=ability_ids,
             passive=passive,
             ability_mods=ability_mods,
             default_rank=default_rank,

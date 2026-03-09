@@ -1,6 +1,7 @@
 """Targeted projectile for ATB lane combat — flies to a target position."""
 
 import pygame
+import math
 from config import SCREEN_WIDTH
 
 
@@ -25,6 +26,17 @@ class Projectile:
         self.sprite = sprite
         self.alive = True
         self.arrived = False  # True when projectile reaches target
+        
+        # Calculate rotation angle once if target is fixed (targeted flight)
+        dx = self.target_x - self.x
+        dy = self.target_y - self.y
+        self.angle = math.degrees(math.atan2(-dy, dx)) # -dy because pygame y goes down
+
+        # Pre-rotate sprite if it exists
+        self.rotated_sprite = None
+        if self.sprite:
+            # We assume the base sprite faces right (0 degrees)
+            self.rotated_sprite = pygame.transform.rotate(self.sprite, self.angle)
 
         # Carry ability mods and passive info for damage processing
         self.ability_mods: list[str] = []
@@ -58,6 +70,11 @@ class Projectile:
             ny = dy / dist
             self.x += nx * self.speed * dt
             self.y += ny * self.speed * dt
+            
+            # Update angle if target moves (optional, but good for dynamic targets)
+            self.angle = math.degrees(math.atan2(-dy, dx))
+            if self.sprite:
+                self.rotated_sprite = pygame.transform.rotate(self.sprite, self.angle)
 
         # Safety: despawn if off-screen
         if self.x < -50 or self.x > SCREEN_WIDTH + 50:
@@ -66,12 +83,14 @@ class Projectile:
     def draw(self, surface: pygame.Surface):
         if not self.alive:
             return
-        if self.sprite:
-            surface.blit(self.sprite,
-                         (int(self.x - self.sprite.get_width() / 2),
-                          int(self.y - self.sprite.get_height() / 2)))
+        if self.rotated_sprite:
+            surface.blit(self.rotated_sprite,
+                         (int(self.x - self.rotated_sprite.get_width() / 2),
+                          int(self.y - self.rotated_sprite.get_height() / 2)))
         else:
             # Fallback: colored ellipse
+            # Let's draw an angled line/ellipse or a rect
+            # Since drawing an angled ellipse is hard, we can just draw a circle
             r = self.rect
             pygame.draw.ellipse(surface, self.color, r)
             core = pygame.Rect(r.x + 2, r.y + 1, r.width - 4, r.height - 2)

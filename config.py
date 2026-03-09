@@ -59,7 +59,7 @@ SHADOW_ALPHA = 60
 # Auto-Battle
 AUTO_BATTLE_ACTION_DELAY = 1.0
 AUTO_BATTLE_FAST_DELAY = 0.4
-DAMAGE_ARMOR_FACTOR = 0.5
+DAMAGE_ARMOR_FACTOR = 1.0  # armor is flat damage reduction per hit
 
 # Map
 MAP_ROWS = 5
@@ -76,8 +76,8 @@ COMBAT_Y_CENTER = 330
 RANK_Y_STAGGER = 10  # slight y offset per rank for depth
 
 # ATB speed bar fill
-ATB_BASE_FILL_RATE = 0.25   # bar fill/sec at speed 0
-ATB_SPEED_SCALING = 0.06    # additional fill/sec per speed point
+ATB_BASE_FILL_RATE = 0.22   # bar fill/sec at speed 0
+ATB_SPEED_SCALING = 0.08    # additional fill/sec per speed point
 
 # Projectiles (targeted flight — no collision grid)
 PROJECTILE_TRAVEL_SPEED = 600

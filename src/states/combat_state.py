@@ -59,6 +59,7 @@ class CombatScreenState(BaseState):
                 char,
                 ability_mods=run.ability_mods.get(char.id, []),
                 stat_boosts=run.stat_boosts.get(char.id, {}),
+                unlocked_abilities=run.unlocked_abilities.get(char.id, []),
             )
             unit.hp = hp_override
             unit.max_hp = run.team_max_hp[char.id]
@@ -150,6 +151,11 @@ class CombatScreenState(BaseState):
         self.end_delay = 0.0
         self.transitioning = False
 
+        # Tracking for position tweening
+        self.previous_positions: dict[str, tuple[float, float]] = {}
+        for unit in self.player_units + self.enemy_units:
+            self.previous_positions[unit.name] = (unit.x, unit.y)
+
     def update(self, dt: float):
         # Update idle animators
         for animator in self.player_animators.values():
@@ -197,6 +203,16 @@ class CombatScreenState(BaseState):
         actions = self.battle.update(dt)
         for action in actions:
             self._process_action(action)
+
+        # Trigger slides for rank changes
+        for unit in self.player_units + self.enemy_units:
+            if unit.name in self.previous_positions:
+                old_x, old_y = self.previous_positions[unit.name]
+                if old_x != unit.x or old_y != unit.y:
+                    dx = old_x - unit.x
+                    dy = old_y - unit.y
+                    self.combat_animator.add_slide_offset(unit.name, dx, dy, 0.3)
+            self.previous_positions[unit.name] = (unit.x, unit.y)
 
         # Projectile trails
         from src.animation.particles import spawn_projectile_trail
@@ -310,15 +326,29 @@ class CombatScreenState(BaseState):
                     img = self.game.asset_manager.get_scaled(
                         base_path + layer_name, SCREEN_WIDTH, SCREEN_HEIGHT)
                     bg.blit(img, (0, 0))
-                ground_shadow = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-                pygame.draw.rect(ground_shadow, (10, 15, 25, 120),
-                                 (0, COMBAT_Y_CENTER + 80, SCREEN_WIDTH, SCREEN_HEIGHT))
-                bg.blit(ground_shadow, (0, 0))
-                dark = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-                dark.fill((10, 10, 20, 60))
-                bg.blit(dark, (0, 0))
             except Exception:
-                bg.fill((20, 18, 25))
+                # Procedural Darkest Dungeon style corridor fallback
+                bg.fill((15, 10, 15))
+                pygame.draw.polygon(bg, (25, 20, 25), [
+                    (0, COMBAT_Y_CENTER + 80), 
+                    (SCREEN_WIDTH, COMBAT_Y_CENTER + 80),
+                    (SCREEN_WIDTH, SCREEN_HEIGHT),
+                    (0, SCREEN_HEIGHT)
+                ])
+                pygame.draw.rect(bg, (10, 5, 10), (0, 0, SCREEN_WIDTH, COMBAT_Y_CENTER + 80))
+                for x in range(100, SCREEN_WIDTH, 300):
+                    pygame.draw.rect(bg, (20, 15, 20), (x, 50, 40, COMBAT_Y_CENTER + 30))
+                    # Torches
+                    pygame.draw.circle(bg, (255, 150, 50), (x + 20, COMBAT_Y_CENTER - 100), 15)
+                    pygame.draw.circle(bg, (255, 200, 100), (x + 20, COMBAT_Y_CENTER - 100), 8)
+                    
+            ground_shadow = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            pygame.draw.rect(ground_shadow, (10, 15, 25, 120),
+                             (0, COMBAT_Y_CENTER + 80, SCREEN_WIDTH, SCREEN_HEIGHT))
+            bg.blit(ground_shadow, (0, 0))
+            dark = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            dark.fill((10, 10, 20, 60))
+            bg.blit(dark, (0, 0))
             self._bg_cache = bg
         return self._bg_cache
 
@@ -364,10 +394,15 @@ class CombatScreenState(BaseState):
                    units: list[CombatUnit],
                    animators: dict[str, IdleAnimator],
                    is_player: bool = False):
-        """Draw player units at their rank positions with speed bars."""
+        """Draw units at their rank positions with UI, sorted by depth."""
         import math
-        for unit in units:
-            animator = animators.get(unit.id)
+        from config import SPEED_BAR_WIDTH
+        
+        # Sort units by their y position to ensure correct depth rendering (painter's algorithm)
+        sorted_units = sorted(units, key=lambda u: u.y)
+
+        for unit in sorted_units:
+            animator = animators.get(unit.name) if not is_player else animators.get(unit.id)
             ox, oy = self.combat_animator.get_offset(unit.name)
             cx = int(unit.x + ox)
             foot_y = int(unit.y + oy)
@@ -382,41 +417,56 @@ class CombatScreenState(BaseState):
                                     glow_surf.get_rect(), 2)
                 surface.blit(glow_surf, (cx - 35, foot_y - 15))
 
+            # Draw Sprite
             if unit.alive and animator:
                 animator.draw(surface, cx, foot_y)
+            elif not is_player and unit.alive and not animator:
+                # Placeholder for enemies without sprites
+                body = pygame.Rect(cx - 30, foot_y - 50, 60, 50)
+                pygame.draw.ellipse(surface, (180, 60, 60), body)
+                pygame.draw.ellipse(surface, (140, 40, 40), body, 2)
             elif not unit.alive and animator:
                 dead_surf = animator.base.copy()
                 dead_surf.fill((60, 60, 60, 160), special_flags=pygame.BLEND_RGBA_MULT)
-                dead_surf = pygame.transform.rotate(dead_surf, -90)
+                dead_surf = pygame.transform.rotate(dead_surf, -90 if is_player else 90)
                 surface.blit(dead_surf, (cx - dead_surf.get_width() // 2,
                                          foot_y - dead_surf.get_height() + 10))
 
-            # Name
+            # UI Elements
             name_color = WHITE if unit.alive else DARK_GRAY
-            draw_text(surface, unit.name, cx, foot_y + 45,
+            draw_text(surface, unit.name, cx, foot_y + 10,
                       size=FONT_SIZE_SMALL, color=name_color, center=True)
 
             # Rank label
             if unit.alive:
-                draw_text(surface, f"R{unit.rank}", cx - 45, foot_y - 100,
+                rank_x_offset = -45 if is_player else 45
+                draw_text(surface, f"R{unit.rank}", cx + rank_x_offset, foot_y - 100,
                           size=10, color=GRAY, center=True)
 
-            # HP bar
+            # HP bar (centered above unit)
             hp_color = RED if unit.alive else DARK_GRAY
             draw_health_bar(surface, cx - 40, foot_y - 115, 80, 8,
                             unit.hp, unit.max_hp, color=hp_color)
 
-            # Speed bar (ATB)
+            # Speed bar (ATB) (centered below name)
             if unit.alive:
-                role = self.player_roles.get(unit.id, "warlock")
-                draw_speed_bar(surface, cx - 30, foot_y + 58,
+                role = self.player_roles.get(unit.id, "warlock") if is_player else None
+                draw_speed_bar(surface, cx - SPEED_BAR_WIDTH // 2, foot_y + 25,
                                unit.speed_bar, unit_class=role,
                                time_active=unit.time_alive)
+                
+                # Turn Indicator when ready
+                if unit.speed_bar >= 1.0:
+                    t = pygame.time.get_ticks() / 1000.0
+                    bob = int(math.sin(t * 10) * 4)
+                    draw_text(surface, "READY!", cx, foot_y - 130 + bob,
+                              size=14, color=GOLD, center=True)
 
             # Block indicator
             if unit.block > 0:
-                pygame.draw.circle(surface, BLUE, (cx - 50, foot_y - 111), 10)
-                draw_text(surface, str(unit.block), cx - 50, foot_y - 111,
+                block_x_offset = -50 if is_player else 50
+                pygame.draw.circle(surface, BLUE, (cx + block_x_offset, foot_y - 111), 10)
+                draw_text(surface, str(unit.block), cx + block_x_offset, foot_y - 111,
                           size=12, color=WHITE, center=True)
 
             # Flash overlay
@@ -427,54 +477,8 @@ class CombatScreenState(BaseState):
                 surface.blit(flash_surf, (cx - 50, foot_y - 100))
 
     def _draw_team_enemies(self, surface: pygame.Surface):
-        """Draw enemy units at their rank positions with speed bars."""
-        for unit in self.enemy_units:
-            animator = self.enemy_animators.get(unit.name)
-            ox, oy = self.combat_animator.get_offset(unit.name)
-            cx = int(unit.x + ox)
-            foot_y = int(unit.y + oy)
-
-            if unit.alive and animator:
-                animator.draw(surface, cx, foot_y)
-            elif unit.alive:
-                body = pygame.Rect(cx - 30, foot_y - 50, 60, 50)
-                pygame.draw.ellipse(surface, (180, 60, 60), body)
-                pygame.draw.ellipse(surface, (140, 40, 40), body, 2)
-            elif not unit.alive and animator:
-                dead_surf = animator.base.copy()
-                dead_surf.fill((60, 60, 60, 160), special_flags=pygame.BLEND_RGBA_MULT)
-                dead_surf = pygame.transform.rotate(dead_surf, 90)
-                surface.blit(dead_surf, (cx - dead_surf.get_width() // 2,
-                                         foot_y - dead_surf.get_height() + 10))
-
-            name_color = WHITE if unit.alive else DARK_GRAY
-            draw_text(surface, unit.name, cx, foot_y + 10,
-                      size=FONT_SIZE_SMALL, color=name_color, center=True)
-
-            # Rank label
-            if unit.alive:
-                draw_text(surface, f"R{unit.rank}", cx + 45, foot_y - 100,
-                          size=10, color=GRAY, center=True)
-
-            hp_color = RED if unit.alive else DARK_GRAY
-            draw_health_bar(surface, cx - 40, foot_y - 115, 80, 8,
-                            unit.hp, unit.max_hp, color=hp_color)
-
-            # Speed bar (ATB) for enemies too
-            if unit.alive:
-                draw_speed_bar(surface, cx - 30, foot_y + 22,
-                               unit.speed_bar, time_active=unit.time_alive)
-
-            if unit.block > 0:
-                pygame.draw.circle(surface, BLUE, (cx + 50, foot_y - 111), 10)
-                draw_text(surface, str(unit.block), cx + 50, foot_y - 111,
-                          size=12, color=WHITE, center=True)
-
-            flash = self.combat_animator.get_flash(unit.name)
-            if flash:
-                flash_surf = pygame.Surface((100, 100), pygame.SRCALPHA)
-                flash_surf.fill(flash)
-                surface.blit(flash_surf, (cx - 50, foot_y - 100))
+        """Draw enemy units (delegates to the unified _draw_team method)."""
+        self._draw_team(surface, self.enemy_units, self.enemy_animators, is_player=False)
 
     def _draw_ability_hud(self, surface: pygame.Surface):
         """Draw ability cooldown bar at bottom for player-controlled unit."""
