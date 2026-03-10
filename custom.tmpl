@@ -66,7 +66,7 @@ async def custom_site():
         __import__(__name__).__file__ = main
 
         # now make a prompt
-        msg  = "Click to Enter the Dungeon"
+        msg  = "Click to Enter the City"
         platform.window.infobox.innerText = msg
 
         while not platform.window.MM.UME:
@@ -330,7 +330,7 @@ function show_infobox() {
 
     <div id="transfer" align=center>
         <div id="game-title">Dungeon of the Acoc</div>
-        <div id="game-subtitle">An Auto-Battler Adventure</div>
+        <div id="game-subtitle">A Gothic Auto-Battler</div>
         <div class="emscripten" id="status">Downloading...</div>
         <div class="emscripten">
             <progress value="0" max="100" id="progress"></progress>

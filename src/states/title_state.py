@@ -6,13 +6,14 @@ from src.ui.button import Button
 from src.ui.text_renderer import draw_text
 from src.core.state_machine import GameState
 from src.animation.tween import pulse
+from src.animation.torch_animator import TorchAnimator
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, GOLD, GRAY,
     PANEL_BORDER,
     FONT_SIZE_TITLE, FONT_SIZE_SMALL, FONT_SIZE_MEDIUM,
 )
 
-BG_PATH = "Potential assets/backgrounds/background 2/orig.png"
+BG_PATH = "Backgrounds/gothic_city/gothic_entrance.png"
 
 
 class TitleState(BaseState):
@@ -28,6 +29,7 @@ class TitleState(BaseState):
             on_click=self._on_quit,
         )
         self._bg = self._render_bg()
+        self.torch_animator = TorchAnimator(self.game.asset_manager)
 
     def _render_bg(self) -> pygame.Surface:
         bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -65,9 +67,11 @@ class TitleState(BaseState):
 
     def update(self, dt: float):
         self.time += dt
+        self.torch_animator.update(dt)
 
     def draw(self, surface: pygame.Surface):
         surface.blit(self._bg, (0, 0))
+        self.torch_animator.draw(surface, "gothic_entrance")
         cx = SCREEN_WIDTH // 2
 
         # Title
@@ -82,7 +86,7 @@ class TitleState(BaseState):
         pygame.draw.polygon(surface, GOLD, diamond)
 
         # Subtitle
-        draw_text(surface, "An Auto-Battler Adventure", cx, 260,
+        draw_text(surface, "A Gothic Auto-Battler", cx, 260,
                   size=FONT_SIZE_SMALL, color=GRAY, center=True)
 
         # Pulsing prompt

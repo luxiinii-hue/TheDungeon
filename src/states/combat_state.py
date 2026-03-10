@@ -16,6 +16,7 @@ from src.animation.particles import (
     spawn_hit_sparks, spawn_death_burst,
 )
 from src.animation.ability_animator import AbilityAnimator
+from src.animation.torch_animator import TorchAnimator
 from src.ui.health_bar import draw_health_bar
 from src.ui.text_renderer import draw_text
 from src.ui.ability_hud import AbilityHUD
@@ -142,6 +143,15 @@ class CombatScreenState(BaseState):
 
         # HUD
         self.ability_hud = AbilityHUD(am)
+        self.torch_animator = TorchAnimator(am)
+
+        # Derive torch bg key from filename
+        if "stairs" in self.bg_filename:
+            self.torch_bg_key = "gothic_stairs"
+        elif "street" in self.bg_filename:
+            self.torch_bg_key = "gothic_street"
+        else:
+            self.torch_bg_key = "gothic_entrance"
 
         # Action log
         self.action_log: list[tuple[str, float]] = []
@@ -157,6 +167,12 @@ class CombatScreenState(BaseState):
         for unit in self.player_units + self.enemy_units:
             self.previous_positions[unit.name] = (unit.x, unit.y)
 
+        # Gothic city background: stairs for boss, street for normal/elite
+        if self.tier == "boss":
+            self.bg_filename = "Backgrounds/gothic_city/gothic_stairs.png"
+        else:
+            self.bg_filename = "Backgrounds/gothic_city/gothic_street.png"
+
     def update(self, dt: float):
         if self.paused:
             return
@@ -169,6 +185,7 @@ class CombatScreenState(BaseState):
         self.combat_animator.update(dt)
         self.particle_emitter.update(dt)
         self.ability_animator.update(dt)
+        self.torch_animator.update(dt)
 
         # Age action log
         self.action_log = [(m, a + dt) for m, a in self.action_log if a + dt < 6.0]
@@ -324,16 +341,15 @@ class CombatScreenState(BaseState):
         if not hasattr(self, "_bg_cache"):
             bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
             try:
-                base_path = "Potential assets/backgrounds/background 2/"
-                for layer_name in ["1.png", "2.png", "3.png", "4.png"]:
-                    img = self.game.asset_manager.get_scaled(
-                        base_path + layer_name, SCREEN_WIDTH, SCREEN_HEIGHT)
-                    bg.blit(img, (0, 0))
-            except Exception:
+                # Load the randomly chosen gothic city background
+                bg = self.game.asset_manager.get_scaled(
+                    self.bg_filename, SCREEN_WIDTH, SCREEN_HEIGHT)
+            except Exception as e:
+                print(f"Error loading background {self.bg_filename}: {e}")
                 # Procedural Darkest Dungeon style corridor fallback
                 bg.fill((15, 10, 15))
                 pygame.draw.polygon(bg, (25, 20, 25), [
-                    (0, COMBAT_Y_CENTER + 80), 
+                    (0, COMBAT_Y_CENTER + 80),
                     (SCREEN_WIDTH, COMBAT_Y_CENTER + 80),
                     (SCREEN_WIDTH, SCREEN_HEIGHT),
                     (0, SCREEN_HEIGHT)
@@ -344,7 +360,7 @@ class CombatScreenState(BaseState):
                     # Torches
                     pygame.draw.circle(bg, (255, 150, 50), (x + 20, COMBAT_Y_CENTER - 100), 15)
                     pygame.draw.circle(bg, (255, 200, 100), (x + 20, COMBAT_Y_CENTER - 100), 8)
-                    
+
             ground_shadow = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             pygame.draw.rect(ground_shadow, (10, 15, 25, 120),
                              (0, COMBAT_Y_CENTER + 80, SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -357,6 +373,7 @@ class CombatScreenState(BaseState):
 
     def draw(self, surface: pygame.Surface):
         surface.blit(self._get_bg(), (0, 0))
+        self.torch_animator.draw(surface, self.torch_bg_key)
 
         # Draw lane divider (subtle center line)
         mid_x = (PLAYER_RANK_X[1] + ENEMY_RANK_X[1]) // 2
@@ -407,7 +424,7 @@ class CombatScreenState(BaseState):
         """Draw units at their rank positions with UI, sorted by depth."""
         import math
         from config import SPEED_BAR_WIDTH
-        
+
         # Sort units by their y position to ensure correct depth rendering (painter's algorithm)
         sorted_units = sorted(units, key=lambda u: u.y)
 
@@ -464,7 +481,7 @@ class CombatScreenState(BaseState):
                 draw_speed_bar(surface, cx - SPEED_BAR_WIDTH // 2, foot_y + 25,
                                unit.speed_bar, unit_class=role,
                                time_active=unit.time_alive)
-                
+
                 # Turn Indicator when ready
                 if unit.speed_bar >= 1.0:
                     t = pygame.time.get_ticks() / 1000.0

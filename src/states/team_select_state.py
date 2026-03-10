@@ -38,8 +38,8 @@ class TeamSelectState(BaseState):
             self.sprites.append(scaled)
             self.animators.append(IdleAnimator(scaled, char.idle_config))
 
-        # Selection state
-        self.selected: set[int] = set()
+        # Selection state — ordered list: first = Leader (player-controlled), second = Ally (AI)
+        self.selected: list[int] = []
 
         # Character slots for click detection
         self.slot_rects: list[pygame.Rect] = []
@@ -78,7 +78,7 @@ class TeamSelectState(BaseState):
         bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         try:
             img = self.game.asset_manager.get_scaled(
-                "Potential assets/backgrounds/background 3/orig.png",
+                "Backgrounds/gothic_city/gothic_entrance.png",
                 SCREEN_WIDTH, SCREEN_HEIGHT)
             bg.blit(img, (0, 0))
         except Exception:
@@ -110,7 +110,8 @@ class TeamSelectState(BaseState):
     def _on_begin(self):
         if len(self.selected) != 2:
             return
-        team = [self.characters[i] for i in sorted(self.selected)]
+        # First selected = Leader (player-controlled), second = Ally (AI)
+        team = [self.characters[i] for i in self.selected]
         self.game.state_machine.transition(GameState.MAP, team=team)
 
     def _on_back(self):
@@ -249,16 +250,23 @@ class TeamSelectState(BaseState):
                           size=FONT_SIZE_SMALL, color=stat_color)
                 sx += len(stat_text) * 7 + 12
 
-            # Selection number badge
+            # Role badge — Leader (player-controlled) or Ally (AI)
             if is_selected:
-                sel_list = sorted(self.selected)
-                sel_num = sel_list.index(i) + 1
-                badge_cx = rect.right - 18
-                badge_cy = rect.y + 18
-                pygame.draw.circle(surface, GOLD, (badge_cx, badge_cy), 14)
-                pygame.draw.circle(surface, (30, 25, 15), (badge_cx, badge_cy), 12)
-                draw_text(surface, str(sel_num), badge_cx, badge_cy,
-                          size=FONT_SIZE_MEDIUM, color=GOLD, center=True)
+                sel_idx = self.selected.index(i)
+                is_leader = sel_idx == 0
+                label = "LEADER" if is_leader else "ALLY"
+                label_color = GOLD if is_leader else (150, 180, 220)
+                badge_bg = (60, 50, 20) if is_leader else (30, 40, 60)
+
+                badge_w = 70
+                badge_h = 22
+                badge_x = rect.centerx - badge_w // 2
+                badge_y = rect.y + 8
+                badge_rect = pygame.Rect(badge_x, badge_y, badge_w, badge_h)
+                pygame.draw.rect(surface, badge_bg, badge_rect, border_radius=badge_h // 2)
+                pygame.draw.rect(surface, label_color, badge_rect, width=1, border_radius=badge_h // 2)
+                draw_text(surface, label, rect.centerx, badge_y + badge_h // 2,
+                          size=FONT_SIZE_SMALL, color=label_color, center=True)
 
         # Info panel for hovered character
         self.info_panel.draw(surface)
@@ -269,6 +277,11 @@ class TeamSelectState(BaseState):
         draw_text(surface, f"{count}/2 selected", SCREEN_WIDTH // 2,
                   SCREEN_HEIGHT - 170,
                   size=FONT_SIZE_MEDIUM, color=status_color, center=True)
+        if count > 0:
+            hint = "Click ally to promote to leader" if count == 2 else "Click to add ally"
+            draw_text(surface, hint, SCREEN_WIDTH // 2,
+                      SCREEN_HEIGHT - 150,
+                      size=FONT_SIZE_SMALL, color=GRAY, center=True)
 
         # Buttons
         if len(self.selected) == 2:
@@ -319,7 +332,14 @@ class TeamSelectState(BaseState):
             for i, rect in enumerate(self.slot_rects):
                 if rect.collidepoint(event.pos) and self.characters[i].unlocked:
                     if i in self.selected:
-                        self.selected.discard(i)
+                        idx = self.selected.index(i)
+                        if idx == 0:
+                            # Clicking the leader deselects them
+                            self.selected.remove(i)
+                        else:
+                            # Clicking the ally promotes them to leader
+                            self.selected.remove(i)
+                            self.selected.insert(0, i)
                     elif len(self.selected) < 2:
-                        self.selected.add(i)
+                        self.selected.append(i)
                     break

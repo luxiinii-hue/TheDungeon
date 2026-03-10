@@ -28,7 +28,7 @@ class ResultState(BaseState):
         bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         try:
             img = self.game.asset_manager.get_scaled(
-                "Potential assets/backgrounds/background 1/orig.png",
+                "Backgrounds/gothic_city/gothic_entrance.png",
                 SCREEN_WIDTH, SCREEN_HEIGHT)
             bg.blit(img, (0, 0))
         except Exception:
@@ -67,11 +67,11 @@ class ResultState(BaseState):
         if self.result == "win":
             title = "VICTORY!"
             color = GOLD
-            subtitle = "The dungeon has been conquered!"
+            subtitle = "The city has been liberated!"
         else:
             title = "DEFEATED"
             color = RED
-            subtitle = "The dungeon claims another soul."
+            subtitle = "The city claims another soul."
 
         title_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         draw_text(title_surf, title, cx, 150,
