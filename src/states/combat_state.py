@@ -16,7 +16,6 @@ from src.animation.particles import (
     spawn_hit_sparks, spawn_death_burst,
 )
 from src.animation.ability_animator import AbilityAnimator
-from src.animation.torch_animator import TorchAnimator
 from src.ui.health_bar import draw_health_bar
 from src.ui.text_renderer import draw_text
 from src.ui.ability_hud import AbilityHUD
@@ -143,15 +142,6 @@ class CombatScreenState(BaseState):
 
         # HUD
         self.ability_hud = AbilityHUD(am)
-        self.torch_animator = TorchAnimator(am)
-
-        # Derive torch bg key from filename
-        if "stairs" in self.bg_filename:
-            self.torch_bg_key = "gothic_stairs"
-        elif "street" in self.bg_filename:
-            self.torch_bg_key = "gothic_street"
-        else:
-            self.torch_bg_key = "gothic_entrance"
 
         # Action log
         self.action_log: list[tuple[str, float]] = []
@@ -185,7 +175,6 @@ class CombatScreenState(BaseState):
         self.combat_animator.update(dt)
         self.particle_emitter.update(dt)
         self.ability_animator.update(dt)
-        self.torch_animator.update(dt)
 
         # Age action log
         self.action_log = [(m, a + dt) for m, a in self.action_log if a + dt < 6.0]
@@ -373,7 +362,6 @@ class CombatScreenState(BaseState):
 
     def draw(self, surface: pygame.Surface):
         surface.blit(self._get_bg(), (0, 0))
-        self.torch_animator.draw(surface, self.torch_bg_key)
 
         # Draw lane divider (subtle center line)
         mid_x = (PLAYER_RANK_X[1] + ENEMY_RANK_X[1]) // 2

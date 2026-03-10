@@ -13,7 +13,6 @@ from src.ui.text_renderer import draw_text
 from src.ui.health_bar import draw_health_bar
 from src.ui.tooltip import Tooltip
 from src.animation.tween import pulse
-from src.animation.torch_animator import TorchAnimator
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, GRAY, GOLD, RED, GREEN, BLUE,
     DARK_GRAY, ORANGE, PURPLE, CYAN, PANEL_BG, PANEL_BORDER,
@@ -63,11 +62,9 @@ class MapState(BaseState):
         self.event_result_timer = 0.0
         self.show_menu_confirm = False
         self.tooltip = Tooltip()
-        self.torch_animator = TorchAnimator(self.game.asset_manager)
 
     def update(self, dt: float):
         self.time += dt
-        self.torch_animator.update(dt)
         if self.event_result_timer > 0:
             self.event_result_timer -= dt
             if self.event_result_timer <= 0:
@@ -94,7 +91,6 @@ class MapState(BaseState):
 
     def draw(self, surface: pygame.Surface):
         surface.blit(self._get_bg(), (0, 0))
-        self.torch_animator.draw(surface, "gothic_street")
 
         # Draw connections first
         for node in self.run.map_nodes:
@@ -646,6 +642,6 @@ class MapState(BaseState):
                 if node.id in self.run.available_node_ids:
                     dx = pos[0] - node.screen_x
                     dy = pos[1] - node.screen_y
-                    if dx * dx + dy * dy <= MAP_NODE_RADIUS * MAP_NODE_RADIUS * 4:
+                    if dx * dx + dy * dy <= MAP_NODE_RADIUS * MAP_NODE_RADIUS * 9:
                         self._handle_node_click(node)
                         return
