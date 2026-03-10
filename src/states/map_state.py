@@ -43,6 +43,29 @@ NODE_LABELS = {
     "start": "Start",
 }
 
+# Map sets mapping
+NODE_TO_SET = {
+    "combat": "set_01",
+    "elite": "set_02",
+    "shop": "set_05",
+    "treasure": "set_13",
+    "rest": "set_07",
+    "event": "set_16",
+    "boss": "set_10",
+    "start": "set_01",
+}
+
+NODE_TO_PROP = {
+    "combat": "house-a.png",
+    "elite": "house-b.png",
+    "shop": "wagon.png",
+    "treasure": "crate-stack.png",
+    "rest": "well.png",
+    "event": "houses.png",
+    "boss": "church-preview-big.png",
+    "start": "house-c.png",
+}
+
 
 class MapState(BaseState):
     def enter(self, **kwargs):
@@ -57,20 +80,61 @@ class MapState(BaseState):
             try:
                 if pygame.mixer.get_init():
                     pygame.mixer.music.load("audio/music/Break Their Will.mp3")
-                    pygame.mixer.music.set_volume(0.3)  # Not too loud
-                    pygame.mixer.music.play(-1)  # Loop infinitely
+                    # Volume controlled by global settings
+                    vol = self.game.settings.volume if not self.game.settings.muted else 0.0
+                    pygame.mixer.music.set_volume(vol)
+                    pygame.mixer.music.play(-1)
             except Exception as e:
                 print(f"Could not load music: {e}")
 
         self.run = self.game.run_manager
+        
+        # Pre-render ribbons/bridges
+        self._bridge_cache_surface = None
+        self._render_bridges()
 
-        # Shop/event overlay state
-        self.overlay = None  # None, "shop", "event", "rest", "treasure"
+        self.overlay = None
         self.overlay_data = None
         self.event_result_message = None
         self.event_result_timer = 0.0
         self.show_menu_confirm = False
         self.tooltip = Tooltip()
+
+    def _render_bridges(self):
+        self._bridge_cache_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        am = self.game.asset_manager
+        
+        # We use set_01 as the default connector set
+        try:
+            ribbon_img = am.load_image("UI/ribbons/set_01/path_horizontal.png")
+            rw, rh = ribbon_img.get_size()
+            # Scale down the bridge width slightly for better fit
+            rh = 16
+            ribbon_img = pygame.transform.smoothscale(ribbon_img, (rw, rh))
+        except Exception:
+            return
+
+        for node in self.run.map_nodes:
+            for cid in node.connections:
+                target = self.run.map_nodes[cid]
+                dx = target.screen_x - node.screen_x
+                dy = target.screen_y - node.screen_y
+                dist = math.hypot(dx, dy)
+                if dist < 5: continue
+                
+                angle = math.degrees(math.atan2(-dy, dx))
+                
+                # Create a flat strip for the distance
+                strip = pygame.Surface((int(dist), rh), pygame.SRCALPHA)
+                for i in range(0, int(dist), rw):
+                    strip.blit(ribbon_img, (i, 0))
+                
+                # Rotate the strip
+                rotated = pygame.transform.rotate(strip, angle)
+                rect = rotated.get_rect(center=(node.screen_x + dx/2, node.screen_y + dy/2))
+                
+                # Draw to cache
+                self._bridge_cache_surface.blit(rotated, rect.topleft)
 
     def update(self, dt: float):
         self.time += dt
@@ -91,24 +155,19 @@ class MapState(BaseState):
                 bg.blit(img, (0, 0))
                 # Dark blue tint for dungeon map feel
                 tint = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-                tint.fill((5, 5, 20, 180))
+                tint.fill((5, 5, 20, 200))
                 bg.blit(tint, (0, 0))
             except Exception:
-                bg.fill((15, 12, 20))
+                bg.fill((10, 10, 15))
             self._bg_cache = bg
         return self._bg_cache
 
     def draw(self, surface: pygame.Surface):
         surface.blit(self._get_bg(), (0, 0))
 
-        # Draw connections first
-        for node in self.run.map_nodes:
-            for cid in node.connections:
-                target = self.run.map_nodes[cid]
-                color = DARK_GRAY if node.visited else (50, 50, 60)
-                pygame.draw.line(surface, color,
-                                 (node.screen_x, node.screen_y),
-                                 (target.screen_x, target.screen_y), 2)
+        # Draw pre-rendered ribbon bridges
+        if self._bridge_cache_surface:
+            surface.blit(self._bridge_cache_surface, (0, 0))
 
         # Draw nodes
         for node in self.run.map_nodes:
@@ -125,61 +184,67 @@ class MapState(BaseState):
             self._draw_menu_confirm(surface)
 
     def _draw_node(self, surface: pygame.Surface, node: MapNode):
-        color = NODE_COLORS.get(node.node_type, GRAY)
+        am = self.game.asset_manager
+        set_name = NODE_TO_SET.get(node.node_type, "set_01")
+        prop_name = NODE_TO_PROP.get(node.node_type, "house-a.png")
         is_available = node.id in self.run.available_node_ids
         is_visited = node.visited
 
-        # Attempt to load icon
-        icon_name = node.node_type if node.node_type != "start" else "combat"
-        icon_path = f"UI/icons/node_{icon_name}.png"
         try:
-            icon = self.game.asset_manager.load_image(icon_path)
-            w, h = icon.get_size()
-            rect = icon.get_rect(center=(node.screen_x, node.screen_y))
+            # 1. Foundation Banner
+            banner = am.load_image(f"UI/ribbons/{set_name}/banner_main.png")
+            bw, bh = banner.get_size()
+            b_rect = banner.get_rect(center=(node.screen_x, node.screen_y))
             
-            if is_visited:
-                dim_icon = icon.copy()
-                dim_icon.fill((80, 80, 80, 255), special_flags=pygame.BLEND_RGBA_MULT)
-                surface.blit(dim_icon, rect)
-            elif is_available:
-                p = pulse(self.time, 1.5, 0.7, 1.0)
-                r = int(MAP_NODE_RADIUS * p)
-                glow_surf = pygame.Surface((r * 4, r * 4), pygame.SRCALPHA)
-                glow_alpha = int(pulse(self.time, 1.5, 30, 80))
-                pygame.draw.circle(glow_surf, (*color, glow_alpha), (r * 2, r * 2), r * 2)
-                surface.blit(glow_surf, (node.screen_x - r * 2, node.screen_y - r * 2))
-                surface.blit(icon, rect)
-            else:
-                dim_icon = icon.copy()
-                dim_icon.fill((120, 120, 120, 255), special_flags=pygame.BLEND_RGBA_MULT)
-                surface.blit(dim_icon, rect)
-        except Exception:
-            # Fallback to circle
-            if is_visited:
-                color = tuple(c // 3 for c in color)
-                pygame.draw.circle(surface, color, (node.screen_x, node.screen_y), MAP_NODE_RADIUS)
-                pygame.draw.circle(surface, DARK_GRAY, (node.screen_x, node.screen_y), MAP_NODE_RADIUS, width=2)
-            elif is_available:
-                p = pulse(self.time, 1.5, 0.7, 1.0)
-                r = int(MAP_NODE_RADIUS * p)
-                glow_surf = pygame.Surface((r * 4, r * 4), pygame.SRCALPHA)
-                glow_alpha = int(pulse(self.time, 1.5, 30, 80))
-                pygame.draw.circle(glow_surf, (*color, glow_alpha), (r * 2, r * 2), r * 2)
-                surface.blit(glow_surf, (node.screen_x - r * 2, node.screen_y - r * 2))
-                pygame.draw.circle(surface, color, (node.screen_x, node.screen_y), r)
-                pygame.draw.circle(surface, WHITE, (node.screen_x, node.screen_y), r, width=2)
-            else:
-                dim_color = tuple(c // 2 for c in color)
-                pygame.draw.circle(surface, dim_color, (node.screen_x, node.screen_y), MAP_NODE_RADIUS)
-                pygame.draw.circle(surface, (60, 60, 70), (node.screen_x, node.screen_y), MAP_NODE_RADIUS, width=1)
+            # 2. Building Prop
+            prop = am.load_image(f"MapProps/{prop_name}")
+            pw, ph = prop.get_size()
+            # Scale building to fit nicely above/on banner
+            target_h = 64 if node.node_type != "boss" else 100
+            aspect = pw / ph
+            prop = pygame.transform.smoothscale(prop, (int(target_h * aspect), target_h))
+            p_rect = prop.get_rect(midbottom=(node.screen_x, node.screen_y + 10))
 
-        # Label
+            if is_visited or not is_available:
+                # Dim components
+                banner = banner.copy()
+                banner.fill((100, 100, 120, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                prop = prop.copy()
+                prop.fill((80, 80, 100, 255), special_flags=pygame.BLEND_RGBA_MULT)
+
+            surface.blit(banner, b_rect)
+            surface.blit(prop, p_rect)
+
+            # 3. Badge Icon Frame
+            frame = am.load_image(f"UI/ribbons/{set_name}/frame_icon.png")
+            frame = pygame.transform.smoothscale(frame, (32, 32))
+            f_rect = frame.get_rect(topright=(b_rect.right - 5, b_rect.top + 5))
+            surface.blit(frame, f_rect)
+            
+            # 4. Small Gameplay Icon
+            icon_name = node.node_type if node.node_type != "start" else "combat"
+            icon = am.load_image(f"UI/icons/node_{icon_name}.png")
+            icon = pygame.transform.smoothscale(icon, (18, 18))
+            surface.blit(icon, icon.get_rect(center=f_rect.center))
+
+            if is_available:
+                # Breathing Glow for available path
+                p = pulse(self.time, 1.5, 0, 50)
+                glow_rect = b_rect.inflate(10, 10)
+                glow_surf = pygame.Surface(glow_rect.size, pygame.SRCALPHA)
+                color = NODE_COLORS.get(node.node_type, GOLD)
+                pygame.draw.rect(glow_surf, (*color, int(p)), glow_surf.get_rect(), border_radius=10, width=2)
+                surface.blit(glow_surf, glow_rect.topleft)
+
+        except Exception as e:
+            # Emergency Fallback to simple circle
+            pygame.draw.circle(surface, NODE_COLORS.get(node.node_type, GRAY), (node.screen_x, node.screen_y), MAP_NODE_RADIUS)
+
+        # Label below
         label = NODE_LABELS.get(node.node_type, "?")
         label_color = WHITE if is_available else GRAY
-        if is_visited:
-            label_color = DARK_GRAY
-        draw_text(surface, label, node.screen_x, node.screen_y + MAP_NODE_RADIUS + 12,
-                  size=FONT_SIZE_SMALL, color=label_color, center=True)
+        if is_visited: label_color = DARK_GRAY
+        draw_text(surface, label, node.screen_x, node.screen_y + 45, size=14, color=label_color, center=True)
 
     def _draw_sidebar(self, surface: pygame.Surface):
         """Draw team HP and gold on the right side."""
@@ -649,8 +714,16 @@ class MapState(BaseState):
             # Handle map node clicks
             for node in self.run.map_nodes:
                 if node.id in self.run.available_node_ids:
-                    dx = pos[0] - node.screen_x
-                    dy = pos[1] - node.screen_y
-                    if dx * dx + dy * dy <= MAP_NODE_RADIUS * MAP_NODE_RADIUS * 9:
-                        self._handle_node_click(node)
-                        return
+                    set_name = NODE_TO_SET.get(node.node_type, "set_01")
+                    try:
+                        banner = self.game.asset_manager.load_image(f"UI/ribbons/{set_name}/banner_main.png")
+                        b_rect = banner.get_rect(center=(node.screen_x, node.screen_y))
+                        if b_rect.collidepoint(pos):
+                            self._handle_node_click(node)
+                            return
+                    except Exception:
+                        dx = pos[0] - node.screen_x
+                        dy = pos[1] - node.screen_y
+                        if dx * dx + dy * dy <= MAP_NODE_RADIUS * MAP_NODE_RADIUS * 9:
+                            self._handle_node_click(node)
+                            return
