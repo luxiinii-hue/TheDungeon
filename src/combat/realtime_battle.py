@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass
 from src.combat.unit import CombatUnit
 from src.combat.ability import AbilityRegistry, AbilityDef
+from src.entities.enemy import EnemyData
 from src.combat.targeting import get_auto_attack_target, get_targets
 from src.combat.projectile import Projectile
 from config import (
@@ -28,6 +29,8 @@ class BattleAction:
 
 
 # Class-themed auto-attack colors
+MAX_RANKS = 4
+
 CLASS_ATTACK_COLORS = {
     "acoc1": (150, 80, 255),   # Shadow Wraith — purple
     "acoc2": (80, 140, 220),   # Flame Knight — blue
@@ -52,15 +55,18 @@ class RealtimeBattle:
                  enemy_units: list[CombatUnit],
                  ability_registry: AbilityRegistry,
                  player_controlled_id: str = "",
-                 asset_manager=None):
+                 asset_manager=None,
+                 enemy_templates: dict[str, EnemyData] | None = None):
         self.player_units = player_units
         self.enemy_units = enemy_units
         self.ability_registry = ability_registry
         self.player_controlled_id = player_controlled_id
         self.asset_manager = asset_manager
+        self.enemy_templates = enemy_templates or {}
         self.projectiles: list[Projectile] = []
         self.result: str | None = None
         self._actions: list[BattleAction] = []
+        self._pending_units: list[CombatUnit] = []
 
         # Assign sequential ranks and set initial positions
         self._assign_ranks(self.player_units)
@@ -146,6 +152,11 @@ class RealtimeBattle:
 
         # Remove dead projectiles
         self.projectiles = [p for p in self.projectiles if p.alive]
+
+        # Merge pending summoned units
+        if self._pending_units:
+            self.enemy_units.extend(self._pending_units)
+            self._pending_units.clear()
 
         # Check win/lose
         self._check_result()
@@ -291,12 +302,7 @@ class RealtimeBattle:
         """Handle self-targeting abilities (summon, buffs, self_move)."""
         for effect in ability.effects:
             if effect.type == "summon":
-                self._actions.append(BattleAction(
-                    type="summon", source=unit.name,
-                    target=effect.enemy_id,
-                    damage=effect.value,
-                    message=f"{unit.name} summons reinforcements!",
-                ))
+                self._do_summon(unit, effect.enemy_id, effect.value)
             elif effect.type == "self_move":
                 self._apply_position_effect(unit, unit, effect.type, effect.value)
         self._actions.append(BattleAction(
@@ -304,6 +310,48 @@ class RealtimeBattle:
             ability_name=ability.name,
             message=f"{unit.name} uses {ability.name}!",
         ))
+
+    def _do_summon(self, summoner: CombatUnit, enemy_id: str, count: int):
+        """Create summoned units in the engine. Deferred to end of tick."""
+        template = self.enemy_templates.get(enemy_id)
+        if not template:
+            return
+        alive_enemies = [u for u in self.enemy_units if u.alive]
+        alive_count = len(alive_enemies) + len(self._pending_units)
+        for _ in range(max(1, count)):
+            if alive_count >= MAX_RANKS:
+                break
+            
+            existing_names = [u.name for u in self.enemy_units + self._pending_units]
+            suffix = 1
+            while f"{template.name} {suffix}" in existing_names:
+                suffix += 1
+                
+            edata = EnemyData(
+                id=template.id,
+                name=f"{template.name} {suffix}",
+                sprite=template.sprite,
+                max_hp=template.max_hp,
+                strength=template.strength,
+                armor=template.armor,
+                speed=template.speed,
+                abilities=list(template.abilities),
+                tier=template.tier,
+                gold_reward=template.gold_reward,
+                color=template.color,
+                idle_config=template.idle_config,
+            )
+            new_unit = CombatUnit.from_enemy(edata)
+            new_unit.rank = alive_count + 1
+            new_unit.x, new_unit.y = rank_to_pos(new_unit.rank, "enemy")
+            new_unit._summon_edata = edata
+            self._pending_units.append(new_unit)
+            alive_count += 1
+            self._actions.append(BattleAction(
+                type="summon", source=summoner.name,
+                target=new_unit.name,
+                message=f"{summoner.name} summons {new_unit.name}!",
+            ))
 
     def _execute_support_ability(self, unit: CombatUnit, ability: AbilityDef,
                                   targets: list[CombatUnit]):

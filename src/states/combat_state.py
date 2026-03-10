@@ -85,6 +85,9 @@ class CombatScreenState(BaseState):
         enemies_data = am.load_json("enemies.json")
         all_enemies = [EnemyData.from_dict(e) for e in enemies_data]
 
+        # Build template lookup for engine-side summoning
+        enemy_templates = {e.id: e for e in all_enemies}
+
         tier_enemies = [e for e in all_enemies if e.tier == self.tier]
         if not tier_enemies:
             tier_enemies = [e for e in all_enemies if e.tier == "normal"]
@@ -130,6 +133,7 @@ class CombatScreenState(BaseState):
             self.player_units, self.enemy_units,
             self.ability_registry, player_id,
             asset_manager=am,
+            enemy_templates=enemy_templates,
         )
 
         # AI controller
@@ -287,38 +291,45 @@ class CombatScreenState(BaseState):
             self._handle_summon(action)
 
     def _handle_summon(self, action: BattleAction):
-        """Spawn a summoned enemy unit at the next available rank."""
-        enemy_id = action.target
-        num_to_spawn = max(1, action.damage)
-        am = self.game.asset_manager
-        all_enemies_raw = am.load_json("enemies.json")
-        all_enemy_data = [EnemyData.from_dict(e) for e in all_enemies_raw]
-        template = next((e for e in all_enemy_data if e.id == enemy_id), None)
-        if not template:
+        """Create visual representation for a unit summoned by the engine."""
+        unit_name = action.target
+        # Find the new unit in the engine's enemy list
+        new_unit = None
+        for u in self.battle.enemy_units:
+            if u.name == unit_name:
+                new_unit = u
+                break
+        if not new_unit:
             return
-        for _ in range(num_to_spawn):
-            spawn_name = f"{template.name} {len(self.enemy_units) + 1}"
-            raw = next(e for e in all_enemies_raw if e["id"] == enemy_id)
-            edata_copy = EnemyData.from_dict(raw)
-            edata_copy.name = spawn_name
-            new_unit = CombatUnit.from_enemy(edata_copy)
-            # Assign next available rank
-            alive_enemies = [u for u in self.enemy_units if u.alive]
-            new_unit.rank = len(alive_enemies) + 1
-            new_unit.x, new_unit.y = rank_to_pos(new_unit.rank, "enemy")
+
+        # Track in our local lists if not already present
+        if new_unit not in self.enemy_units:
             self.enemy_units.append(new_unit)
-            self.enemy_data.append(edata_copy)
-            self.battle.enemy_units.append(new_unit)
-            if template.sprite:
-                img = am.load_image(template.sprite)
+
+        # Get sprite info from stashed enemy data
+        edata = getattr(new_unit, '_summon_edata', None)
+        if edata and edata not in self.enemy_data:
+            self.enemy_data.append(edata)
+
+        # Create animator if we don't have one yet
+        if unit_name not in self.enemy_animators:
+            if edata and edata.sprite:
+                am = self.game.asset_manager
+                img = am.load_image(edata.sprite)
                 sprite_h = 100
                 aspect = img.get_width() / img.get_height()
                 sprite_w = int(sprite_h * aspect)
-                scaled = am.get_scaled(template.sprite, sprite_w, sprite_h)
-                self.enemy_animators[new_unit.name] = IdleAnimator(
-                    scaled, template.idle_config)
+                scaled = am.get_scaled(edata.sprite, sprite_w, sprite_h)
+                self.enemy_animators[unit_name] = IdleAnimator(
+                    scaled, edata.idle_config)
             else:
-                self.enemy_animators[new_unit.name] = None
+                self.enemy_animators[unit_name] = None
+
+        # Spawn entry particles at the new unit's position (purple burst)
+        spawn_death_burst(self.particle_emitter, new_unit.x, new_unit.y, color=(200, 80, 255))
+
+        # Track position for slide animation
+        self.previous_positions[unit_name] = (new_unit.x, new_unit.y)
 
     def _find_unit(self, name: str) -> CombatUnit | None:
         for u in self.player_units + self.enemy_units:
