@@ -60,15 +60,15 @@
 
 ## Backlog (Future)
 
-| # | Task | Notes |
-|---|------|-------|
-| B.1 | Position swap ability (player can rearrange their team mid-combat) | Strategic depth |
-| B.2 | Taunt mechanic (force enemies to target specific rank) | Tank role |
-| B.3 | Multi-rank bosses (occupy positions 1-2, wider sprite) | Boss variety |
-| B.4 | Speed buff/debuff abilities (haste/slow fill rate) | ATB manipulation |
-| B.5 | Sound effects (attack, hit, ability, death, speed bar ding) | Audio |
-| B.6 | Multiplayer (second player controls a different party member) | Coop |
-| B.7 | Remaining abilities from potentialabilitiesplan.md (Void Step, Holy Provocation, Ignite, Bloodlust Charge, Caltrops, enemy abilities) | More depth |
+| # | Task | Notes | Status |
+|---|------|-------|--------|
+| B.1 | Position swap ability (player can rearrange their team mid-combat) | Strategic depth | DONE |
+| B.2 | Taunt mechanic (force enemies to target specific rank) | Tank role | DONE |
+| B.3 | Multi-rank bosses (occupy positions 1-2, wider sprite) | Boss variety | DONE |
+| B.4 | Speed buff/debuff abilities (haste/slow fill rate) | ATB manipulation | DONE |
+| B.5 | Sound effects (attack, hit, ability, death, speed bar ding) | Audio | TODO |
+| B.6 | Multiplayer (second player controls a different party member) | Coop | TODO |
+| B.7 | Remaining abilities from potentialabilitiesplan.md (Void Step, Holy Provocation, Ignite, Bloodlust Charge, Caltrops, enemy abilities) | More depth | DONE |
 
 ---
 
@@ -83,6 +83,7 @@
 | `ability_animator.py` | Gemini | — | Gemini only |
 | `ability_hud.py` | Gemini | — | Gemini only |
 | `speed_bar.py` | Gemini | — | Gemini only (new file) |
+| `map_state.py` | Gemini | Claude | Gemini owns layered rendering and bridge caching |
 
 ---
 
@@ -98,4 +99,5 @@ _Record major milestones and blockers here:_
 | 2026-03-09 | Claude | Added Abyssal Smash (unlockable melee AoE stun for Nightfang). Wired through abilities.json, rewards.json (ability_unlock type), events.json (Abyssal Altar event), RunManager.unlock_ability(), CombatUnit.from_character(unlocked_abilities=), reward_state.py. Uses AoEStun.png asset. |
 | 2026-03-09 | Claude | Sprint 3 Claude tasks DONE (3.6–3.8). Boss: added Life Drain ability for Goblin Warlock (ranged drain + self-heal), wired life_drain effect in battle engine. Relics: wired team_speed effect (Quicksilver Pendant) in RunManager.apply_relic(). HP sync was already done in Sprint 1 (combat_state lines 179-180). |
 | 2026-03-09 | Claude | Balance pass (3.1): DAMAGE_ARMOR_FACTOR 0.5->1.0 (armor is now meaningful flat reduction), ATB_BASE_FILL_RATE 0.25->0.22 + ATB_SPEED_SCALING 0.06->0.08 (wider speed spread, 1.8x ratio from speed 1->4). Shadow Wraith +1 armor, Goblin Mage str 1->2. Enemy rebalance: Fat Fly HP 30->25 (trash), Goblin Brute str 3->4/HP 45->40 (glass cannon brute), Sentinel armor 2->3/HP 50->55 (true tank), Assassin str 4->5/speed 4->5/HP 55->45 (deadly glass cannon), Boss HP 120->160/armor 2->3 (longer fights), Cultist HP 15->20. Mana Shield block 12->15, Summon cd 7->9. Simulated: normal ~9s, elite ~6s, boss ~15s. |
-| 2026-03-10 | Gemini | Theme Pivot: Dungeon â†’ Gothic City. Converted .jpg assets from `potential assets/New backgrounds` to .png, resized to 1280x720, and applied gothic nocturnal tint. Updated `combat_state.py` to randomly select from these new backgrounds (`gothic_stairs.png`, `gothic_entrance.png`, `gothic_street.png`). |
+| 2026-03-10 | Gemini | Theme Pivot: Dungeon → Gothic City. Converted .jpg assets from `potential assets/New backgrounds` to .png, resized to 1280x720, and applied gothic nocturnal tint. Updated `combat_state.py` to randomly select from these new backgrounds (`gothic_stairs.png`, `gothic_entrance.png`, `gothic_street.png`). |
+| 2026-03-10 | Gemini | Massive Core Mechanics & Content Update: Implemented Taunt, Poison (DoT + slow), Haste/Slow, Phase, Swap, and Traps. Added 5 new player abilities and 8 new enemy abilities. Implemented multi-rank boss sizing (Warlock size 2). Integrated global SettingsOverlay for music volume control. Completed the full Gothic Map Redesign with pre-rendered ribbon bridges and layered building landmarks. |

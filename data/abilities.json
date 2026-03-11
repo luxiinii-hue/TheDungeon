@@ -121,7 +121,7 @@
         "scaling": 0.8,
         "cooldown": 4.5,
         "effects": [],
-        "icon": "UI/ability_icons/Icons_Fire Ball.png",
+        "icon": "UI/ability_icons/fire_spell_icon.png",
         "animation": {
             "type": "spell",
             "frames_dir": "Animations/abilities/Fire Ball",
@@ -324,7 +324,7 @@
                 "type": "armor_pierce"
             }
         ],
-        "icon": "UI/ability_icons/Icons_Fire Arrow.png",
+        "icon": "UI/ability_icons/fire_arrow_icon.png",
         "animation": {
             "type": "spell",
             "frames_dir": "Animations/abilities/Fire Arrow",
@@ -442,7 +442,7 @@
                 "enemy_id": "cultist_minion"
             }
         ],
-        "icon": "UI/ability_icons/Icon18.png",
+        "icon": "UI/ability_icons/Icon19.png",
         "animation": {
             "type": "spell",
             "frames_dir": "Animations/abilities/Fire Spell",
@@ -474,7 +474,7 @@
                 "duration": 2
             }
         ],
-        "icon": "UI/ability_icons/Icon19.png",
+        "icon": "UI/ability_icons/Icon21.png",
         "animation": {
             "type": "spell",
             "frames_dir": "Animations/abilities/Water Spell",
@@ -506,7 +506,7 @@
                 "value": 10
             }
         ],
-        "icon": "UI/ability_icons/Icon16.png",
+        "icon": "UI/ability_icons/Icon17.png",
         "animation": {
             "type": "spell",
             "frames_dir": "Animations/abilities/Fire Spell",
@@ -546,7 +546,7 @@
                 "value": 5
             }
         ],
-        "icon": "UI/ability_icons/Icons_Fire Ball.png",
+        "icon": "UI/ability_icons/fire_ball_icon.png",
         "animation": {
             "type": "spell",
             "frames_dir": "Animations/abilities/Fire Ball",
@@ -585,10 +585,10 @@
                 "value": 1
             }
         ],
-        "icon": "UI/weapon_icons/Icon28_09.png",
+        "icon": "UI/weapon_icons/Icon28_10.png",
         "animation": {
             "type": "melee_slash",
-            "sprite": "UI/weapon_icons/Icon28_09.png",
+            "sprite": "UI/weapon_icons/Icon28_10.png",
             "tint": [
                 200,
                 40,
@@ -624,7 +624,7 @@
                 "value": 15
             }
         ],
-        "icon": "UI/ability_icons/Icon5.png",
+        "icon": "UI/ability_icons/Icon6.png",
         "animation": {
             "type": "spell",
             "frames_dir": "Animations/abilities/Water Arrow",
@@ -663,7 +663,7 @@
                 "value": 1
             }
         ],
-        "icon": "",
+        "icon": "UI/weapon_icons/Icon28_28.png",
         "animation": {
             "type": "melee_slash",
             "tint": [
@@ -672,7 +672,8 @@
                 60
             ],
             "scale": 80,
-            "duration": 0.4
+            "duration": 0.4,
+            "sprite": "UI/weapon_icons/Icon28_28.png"
         },
         "projectile": {
             "speed": 600,
@@ -705,7 +706,7 @@
                 "value": 20
             }
         ],
-        "icon": "",
+        "icon": "UI/ability_icons/Icon15.png",
         "animation": {
             "type": "spell",
             "tint": [
@@ -733,7 +734,7 @@
                 "value": 4
             }
         ],
-        "icon": "",
+        "icon": "UI/ability_icons/Icon4.png",
         "animation": {
             "type": "spell",
             "tint": [
@@ -766,7 +767,7 @@
         "scaling": 1.5,
         "cooldown": 5.0,
         "effects": [],
-        "icon": "",
+        "icon": "UI/weapon_icons/Icon28_01.png",
         "animation": {
             "type": "melee_slash",
             "tint": [
@@ -775,7 +776,8 @@
                 60
             ],
             "scale": 80,
-            "duration": 0.4
+            "duration": 0.4,
+            "sprite": "UI/weapon_icons/Icon28_01.png"
         },
         "projectile": {
             "speed": 1000,
@@ -805,7 +807,7 @@
                 "value": 5
             }
         ],
-        "icon": "",
+        "icon": "UI/ability_icons/Icon3.png",
         "animation": {
             "type": "spell",
             "tint": [
@@ -844,7 +846,7 @@
                 "value": 5
             }
         ],
-        "icon": "",
+        "icon": "UI/ability_icons/Icon39.png",
         "animation": {
             "type": "spell",
             "tint": [
@@ -886,7 +888,7 @@
                 "duration": 3
             }
         ],
-        "icon": "",
+        "icon": "UI/ability_icons/Icon1.png",
         "animation": {
             "type": "spell",
             "tint": [
@@ -917,7 +919,7 @@
                 "duration": 4
             }
         ],
-        "icon": "",
+        "icon": "UI/ability_icons/Icon18.png",
         "animation": {
             "type": "spell",
             "tint": [

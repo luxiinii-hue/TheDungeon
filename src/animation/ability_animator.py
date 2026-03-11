@@ -124,8 +124,10 @@ class AbilityAnimator:
                     scale: int = 64, duration: float = 0.3,
                     tint: tuple[int, int, int] | None = None):
         """Spawn a melee slash animation at (x, y)."""
+        if not sprite_path:
+            return
         full_path = os.path.join(ASSET_DIR, sprite_path)
-        if not os.path.exists(full_path):
+        if not os.path.exists(full_path) or os.path.isdir(full_path):
             return
         img = pygame.image.load(full_path).convert_alpha()
         img = pygame.transform.smoothscale(img, (scale, scale))
@@ -139,8 +141,10 @@ class AbilityAnimator:
                          scale: int = 200, duration: float = 0.8,
                          tint: tuple[int, int, int] | None = None):
         """Spawn a large tweening slam animation (like Abyssal Smash)."""
+        if not sprite_path:
+            return
         full_path = os.path.join(ASSET_DIR, sprite_path)
-        if not os.path.exists(full_path):
+        if not os.path.exists(full_path) or os.path.isdir(full_path):
             return
         img = pygame.image.load(full_path).convert_alpha()
         

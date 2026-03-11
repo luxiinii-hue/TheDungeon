@@ -30,6 +30,9 @@ class Game:
 
         # RunManager lives here — survives across state transitions
         self.run_manager = None
+        
+        from src.ui.settings_overlay import SettingsOverlay
+        self.settings = SettingsOverlay()
 
         self._register_states()
         self.state_machine.transition(GameState.TITLE)
@@ -52,10 +55,13 @@ class Game:
                     consumed = self.settings.handle_event(event)
                     if not consumed:
                         self.state_machine.current.handle_event(event)
+            
             if not self.settings.active:
                 self.state_machine.current.update(dt)
+            
             self.state_machine.current.draw(self.screen)
             self.settings.draw(self.screen)
+            
             pygame.display.flip()
             await asyncio.sleep(0)
 

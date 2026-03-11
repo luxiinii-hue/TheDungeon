@@ -3,20 +3,7 @@
 import pygame
 from config import PANEL_BG, PANEL_BORDER, WHITE, GRAY, GOLD, GREEN, FONT_SIZE_SMALL, FONT_SIZE_MEDIUM, CLASS_COLORS
 from src.ui.text_renderer import draw_text
-
-
-_icon_cache: dict[str, pygame.Surface] = {}
-
-def get_icon(name: str) -> pygame.Surface | None:
-    if name not in _icon_cache:
-        import os
-        from config import ASSET_DIR
-        path = os.path.join(ASSET_DIR, "UI", "icons", f"{name}.png")
-        if os.path.exists(path):
-            _icon_cache[name] = pygame.image.load(path).convert_alpha()
-        else:
-            _icon_cache[name] = None
-    return _icon_cache[name]
+from src.ui.icons import get_icon
 
 
 class Panel:
@@ -69,10 +56,10 @@ class CharacterPanel(Panel):
             ("SPD", cd.speed, "boot"),
         ]
         for stat_name, stat_val, icon_name in stats:
-            icon = get_icon(icon_name)
+            icon = get_icon(icon_name, size=(20, 20))
             if icon:
-                surface.blit(icon, (stat_x, stat_y - 4))
-                draw_text(surface, f"{stat_name}: {stat_val}", stat_x + 30, stat_y,
+                surface.blit(icon, (stat_x, stat_y - 2))
+                draw_text(surface, f"{stat_name}: {stat_val}", stat_x + 28, stat_y,
                           size=FONT_SIZE_SMALL, color=WHITE)
             else:
                 draw_text(surface, f"{stat_name}: {stat_val}", stat_x, stat_y,
