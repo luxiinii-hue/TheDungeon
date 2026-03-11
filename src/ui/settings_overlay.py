@@ -146,11 +146,12 @@ class SettingsOverlay:
 
         music_img = get_icon("music", size=(32, 32))
         if music_img:
-            img_to_draw = music_img
+            surface.blit(music_img, (self.mute_btn.centerx - 16, self.mute_btn.centery - 16))
             if self.muted:
-                img_to_draw = music_img.copy()
-                img_to_draw.fill(RED, special_flags=pygame.BLEND_RGB_MULT)
-            surface.blit(img_to_draw, (self.mute_btn.centerx - 16, self.mute_btn.centery - 16))
+                # Draw a clean red diagonal line over the music icon to indicate it is muted
+                pygame.draw.line(surface, RED, 
+                                 (self.mute_btn.centerx - 14, self.mute_btn.centery - 14), 
+                                 (self.mute_btn.centerx + 14, self.mute_btn.centery + 14), 4)
         else:
             draw_text(surface, "Unmute" if self.muted else "Mute", self.mute_btn.centerx, self.mute_btn.centery, size=FONT_SIZE_MEDIUM, color=WHITE, center=True)
 

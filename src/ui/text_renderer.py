@@ -21,12 +21,22 @@ def get_font(size: int, font_type: str = "body") -> pygame.font.Font:
 
 def draw_text(surface: pygame.Surface, text: str, x: int, y: int,
               size: int = 24, color=WHITE, center: bool = False,
-              font_type: str = "body"):
+              font_type: str = "body", shadow: bool = False):
     font = get_font(size, font_type)
     text_surf = font.render(text, True, color)
     if center:
         rect = text_surf.get_rect(center=(x, y))
     else:
         rect = text_surf.get_rect(topleft=(x, y))
+        
+    if shadow:
+        shadow_surf = font.render(text, True, (0, 0, 0))
+        shadow_rect = shadow_surf.get_rect()
+        if center:
+            shadow_rect.center = (rect.centerx + 1, rect.centery + 1)
+        else:
+            shadow_rect.topleft = (rect.x + 1, rect.y + 1)
+        surface.blit(shadow_surf, shadow_rect)
+        
     surface.blit(text_surf, rect)
     return rect
