@@ -262,19 +262,28 @@ class MapState(BaseState):
 
         for char in self.run.team:
             hp = self.run.team_hp[char.id]
-            max_hp = self.run.team_max_hp[char.id]
-            
-            # Heart icon for health
+            max_hp = self.run.team_max_hp[char.id]            # Character portrait for health/status
             try:
-                heart_icon = self.game.asset_manager.load_image("UI/icons/heart.png")
-                surface.blit(heart_icon, (sidebar_x + 15, y - 2))
-                draw_text(surface, char.name, sidebar_x + 45, y,
+                # Load character sprite
+                char_img = self.game.asset_manager.load_image(char.sprite)
+                
+                # Scale character sprite to a portrait size
+                portrait_size = 28
+                char_scaled = pygame.transform.smoothscale(char_img, (portrait_size, portrait_size))
+                
+                # Draw character sprite
+                surface.blit(char_scaled, (sidebar_x + 15, y - 4))
+                
+                # Name text shifted over slightly to account for the sprite
+                draw_text(surface, char.name, sidebar_x + 15 + portrait_size + 8, y + 2,
                           size=FONT_SIZE_SMALL, color=WHITE)
-            except Exception:
+            except Exception as e:
+                # Fallback if image fails to load
                 draw_text(surface, char.name, sidebar_x + 15, y,
                           size=FONT_SIZE_SMALL, color=WHITE)
-            
-            y += 20
+
+            # Move down a bit more since the sprite is larger than the old text/heart
+            y += 32
             draw_health_bar(surface, sidebar_x + 15, y, 210, 16,
                             hp, max_hp, color=RED)
             y += 30
